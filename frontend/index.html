@@ -1,0 +1,1199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Face Authentication</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            color: #222;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .tabs {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+        }
+
+        .tab {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            background: #ddd;
+            cursor: pointer;
+            font-size: 15px;
+        }
+
+        .tab.active {
+            background: #222;
+            color: white;
+        }
+
+        .section {
+            display: none;
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+        }
+
+        .section.active {
+            display: block;
+        }
+
+        input {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 7px;
+            font-size: 15px;
+        }
+
+        button {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 7px;
+            background: #222;
+            color: white;
+            cursor: pointer;
+            font-size: 15px;
+            margin: 5px;
+        }
+
+        button:hover {
+            opacity: 0.85;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .camera-container {
+            text-align: center;
+        }
+
+        video {
+            width: 100%;
+            max-width: 640px;
+            border-radius: 12px;
+            background: black;
+            margin: 15px auto;
+            display: block;
+        }
+
+        .status {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 7px;
+            font-weight: bold;
+            text-align: center;
+            min-height: 20px;
+        }
+
+        .user-info {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f0f0f0;
+            border-radius: 8px;
+        }
+
+        .logout {
+            background: #c62828;
+        }
+
+        .info {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #666;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>Face Authentication System</h1>
+
+    <!-- ============================= -->
+    <!-- NAVIGATION -->
+    <!-- ============================= -->
+
+    <div class="tabs">
+
+        <button
+            class="tab active"
+            data-target="register">
+            Register
+        </button>
+
+        <button
+            class="tab"
+            data-target="login">
+            Login
+        </button>
+
+        <button
+            class="tab"
+            data-target="faceRegister">
+            Face Register
+        </button>
+
+        <button
+            class="tab"
+            data-target="faceLogin">
+            Login with Face ID
+        </button>
+
+    </div>
+
+
+    <!-- ============================= -->
+    <!-- REGISTER -->
+    <!-- ============================= -->
+
+    <section
+        id="register"
+        class="section active">
+
+        <h2>Create Account</h2>
+
+        <p class="info">
+            Create your account before registering your face.
+        </p>
+
+        <form id="registerForm">
+
+            <input
+                type="text"
+                id="registerName"
+                placeholder="Full Name"
+                required
+            >
+
+            <input
+                type="email"
+                id="registerEmail"
+                placeholder="Email"
+                required
+            >
+
+            <input
+                type="password"
+                id="registerPassword"
+                placeholder="Password"
+                required
+            >
+
+            <button type="submit">
+                Register
+            </button>
+
+        </form>
+
+        <div
+            id="registerStatus"
+            class="status">
+        </div>
+
+    </section>
+
+
+    <!-- ============================= -->
+    <!-- LOGIN -->
+    <!-- ============================= -->
+
+    <section
+        id="login"
+        class="section">
+
+        <h2>Login</h2>
+
+        <form id="loginForm">
+
+            <input
+                type="email"
+                id="loginEmail"
+                placeholder="Email"
+                required
+            >
+
+            <input
+                type="password"
+                id="loginPassword"
+                placeholder="Password"
+                required
+            >
+
+            <button type="submit">
+                Login
+            </button>
+
+        </form>
+
+        <div
+            id="loginStatus"
+            class="status">
+        </div>
+
+        <div
+            id="loginUser"
+            class="user-info"
+            style="display:none;">
+        </div>
+
+    </section>
+
+
+    <!-- ============================= -->
+    <!-- FACE REGISTER -->
+    <!-- ============================= -->
+
+    <section
+        id="faceRegister"
+        class="section">
+
+        <h2>Register Your Face</h2>
+
+        <p class="info">
+            Login first, then register your face.
+        </p>
+
+        <div class="camera-container">
+
+            <video
+                id="registerVideo"
+                autoplay
+                playsinline>
+            </video>
+
+            <button id="startRegisterCamera">
+                Start Camera
+            </button>
+
+            <button
+                id="captureFace"
+                disabled>
+                Capture & Register Face
+            </button>
+
+        </div>
+
+        <div
+            id="faceRegisterStatus"
+            class="status">
+        </div>
+
+    </section>
+
+
+    <!-- ============================= -->
+    <!-- FACE LOGIN -->
+    <!-- ============================= -->
+
+    <section
+        id="faceLogin"
+        class="section">
+
+        <h2>Login with Face ID</h2>
+
+        <p class="info">
+            Look at the camera and authenticate using your registered face.
+        </p>
+
+        <div class="camera-container">
+
+            <video
+                id="loginVideo"
+                autoplay
+                playsinline>
+            </video>
+
+            <button id="startLoginCamera">
+                Start Camera
+            </button>
+
+            <button
+                id="faceLoginButton"
+                disabled>
+                Login with Face
+            </button>
+
+        </div>
+
+        <div
+            id="faceLoginStatus"
+            class="status">
+        </div>
+
+        <div
+            id="faceLoginUser"
+            class="user-info"
+            style="display:none;">
+        </div>
+
+    </section>
+
+
+    <!-- ============================= -->
+    <!-- LOGOUT -->
+    <!-- ============================= -->
+
+    <div style="text-align:center; margin-top:30px;">
+
+        <button
+            id="logoutButton"
+            class="logout">
+            Logout
+        </button>
+
+    </div>
+
+</div>
+
+
+<script>
+
+const API_URL =
+    "http://127.0.0.1:8000";
+
+
+// ==================================================
+// HELPER FUNCTIONS
+// ==================================================
+
+function getToken() {
+
+    return localStorage.getItem(
+        "access_token"
+    );
+}
+
+
+function saveToken(token) {
+
+    localStorage.setItem(
+        "access_token",
+        token
+    );
+}
+
+
+function clearToken() {
+
+    localStorage.removeItem(
+        "access_token"
+    );
+}
+
+
+function showError(element, message) {
+
+    element.textContent = message;
+}
+
+
+function showSuccess(element, message) {
+
+    element.textContent = message;
+}
+
+
+async function getResponseData(response) {
+
+    const text =
+        await response.text();
+
+    if (!text) {
+        return {};
+    }
+
+    try {
+
+        return JSON.parse(text);
+
+    } catch {
+
+        return {
+            detail: text
+        };
+    }
+}
+
+
+// ==================================================
+// STREAM MANAGEMENT & TAB NAVIGATION
+// ==================================================
+
+let registerStream = null;
+let loginStream = null;
+
+function stopAllStreams() {
+    if (registerStream) {
+        registerStream.getTracks().forEach(track => track.stop());
+        registerStream = null;
+        const regVideo = document.getElementById("registerVideo");
+        if (regVideo) regVideo.srcObject = null;
+        const capBtn = document.getElementById("captureFace");
+        if (capBtn) capBtn.disabled = true;
+    }
+
+    if (loginStream) {
+        loginStream.getTracks().forEach(track => track.stop());
+        loginStream = null;
+        const logVideo = document.getElementById("loginVideo");
+        if (logVideo) logVideo.srcObject = null;
+        const faceLogBtn = document.getElementById("faceLoginButton");
+        if (faceLogBtn) faceLogBtn.disabled = true;
+    }
+}
+
+document.querySelectorAll(".tab")
+    .forEach(button => {
+
+        button.addEventListener(
+            "click",
+            () => {
+
+                stopAllStreams();
+
+                document
+                    .querySelectorAll(".tab")
+                    .forEach(tab =>
+                        tab.classList.remove(
+                            "active"
+                        )
+                    );
+
+                document
+                    .querySelectorAll(".section")
+                    .forEach(section =>
+                        section.classList.remove(
+                            "active"
+                        )
+                    );
+
+                button.classList.add(
+                    "active"
+                );
+
+                document
+                    .getElementById(
+                        button.dataset.target
+                    )
+                    .classList.add(
+                        "active"
+                    );
+            }
+        );
+    });
+
+
+// ==================================================
+// NORMAL REGISTER
+// ==================================================
+
+document
+    .getElementById("registerForm")
+    .addEventListener(
+        "submit",
+        async event => {
+
+            event.preventDefault();
+
+            const status =
+                document.getElementById(
+                    "registerStatus"
+                );
+
+            status.textContent =
+                "Registering...";
+
+
+            const data = {
+
+                name:
+                    document.getElementById(
+                        "registerName"
+                    ).value.trim(),
+
+                email:
+                    document.getElementById(
+                        "registerEmail"
+                    ).value.trim(),
+
+                password:
+                    document.getElementById(
+                        "registerPassword"
+                    ).value
+
+            };
+
+
+            try {
+
+                const response =
+                    await fetch(
+                        `${API_URL}/api/v1/auth/register`,
+                        {
+                            method: "POST",
+
+                            headers: {
+                                "Content-Type":
+                                    "application/json"
+                            },
+
+                            body:
+                                JSON.stringify(data)
+                        }
+                    );
+
+
+                const result =
+                    await getResponseData(
+                        response
+                    );
+
+
+                if (!response.ok) {
+
+                    throw new Error(
+                        result.detail ||
+                        "Registration failed"
+                    );
+                }
+
+
+                showSuccess(
+                    status,
+                    "Registration successful. You can now login."
+                );
+
+
+                document
+                    .getElementById(
+                        "registerForm"
+                    )
+                    .reset();
+
+
+            } catch (error) {
+
+                showError(
+                    status,
+                    "Registration failed: " +
+                    error.message
+                );
+            }
+        }
+    );
+
+
+// ==================================================
+// NORMAL LOGIN
+// ==================================================
+
+document
+    .getElementById("loginForm")
+    .addEventListener(
+        "submit",
+        async event => {
+
+            event.preventDefault();
+
+            const status =
+                document.getElementById(
+                    "loginStatus"
+                );
+
+            status.textContent =
+                "Logging in...";
+
+
+            const data = {
+
+                email:
+                    document.getElementById(
+                        "loginEmail"
+                    ).value.trim(),
+
+                password:
+                    document.getElementById(
+                        "loginPassword"
+                    ).value
+
+            };
+
+
+            try {
+
+                const response =
+                    await fetch(
+                        `${API_URL}/api/v1/auth/login`,
+                        {
+                            method: "POST",
+
+                            headers: {
+                                "Content-Type":
+                                    "application/json"
+                            },
+
+                            body:
+                                JSON.stringify(data)
+                        }
+                    );
+
+
+                const result =
+                    await getResponseData(
+                        response
+                    );
+
+
+                if (!response.ok) {
+
+                    throw new Error(
+                        result.detail ||
+                        "Login failed"
+                    );
+                }
+
+
+                saveToken(
+                    result.access_token
+                );
+
+
+                showSuccess(
+                    status,
+                    "Login successful!"
+                );
+
+
+                const user =
+                    document.getElementById(
+                        "loginUser"
+                    );
+
+                user.style.display =
+                    "block";
+
+                user.innerHTML =
+                    `
+                    <strong>Logged in</strong>
+                    <br>
+                    Token stored successfully.
+                    `;
+
+
+            } catch (error) {
+
+                showError(
+                    status,
+                    "Login failed: " +
+                    error.message
+                );
+            }
+        }
+    );
+
+
+// ==================================================
+// FACE REGISTER CAMERA
+// ==================================================
+
+const registerVideo =
+    document.getElementById(
+        "registerVideo"
+    );
+
+const startRegisterCamera =
+    document.getElementById(
+        "startRegisterCamera"
+    );
+
+const captureFace =
+    document.getElementById(
+        "captureFace"
+    );
+
+const faceRegisterStatus =
+    document.getElementById(
+        "faceRegisterStatus"
+    );
+
+
+startRegisterCamera
+    .addEventListener(
+        "click",
+        async () => {
+
+            if (!getToken()) {
+
+                faceRegisterStatus.textContent =
+                    "Please login first.";
+
+                return;
+            }
+
+            stopAllStreams();
+
+            try {
+
+                registerStream =
+                    await navigator
+                        .mediaDevices
+                        .getUserMedia({
+                            video: true,
+                            audio: false
+                        });
+
+
+                registerVideo.srcObject =
+                    registerStream;
+
+
+                captureFace.disabled =
+                    false;
+
+
+                faceRegisterStatus.textContent =
+                    "Camera started. Position your face and capture.";
+
+            } catch (error) {
+
+                faceRegisterStatus.textContent =
+                    "Camera error: " +
+                    error.message;
+            }
+        }
+    );
+
+
+// ==================================================
+// FACE REGISTER
+// ==================================================
+
+captureFace
+    .addEventListener(
+        "click",
+        async () => {
+
+            if (!registerStream) {
+
+                faceRegisterStatus.textContent =
+                    "Start the camera first.";
+
+                return;
+            }
+
+
+            const canvas =
+                document.createElement(
+                    "canvas"
+                );
+
+
+            canvas.width =
+                registerVideo.videoWidth;
+
+            canvas.height =
+                registerVideo.videoHeight;
+
+
+            const context =
+                canvas.getContext(
+                    "2d"
+                );
+
+
+            context.drawImage(
+                registerVideo,
+                0,
+                0,
+                canvas.width,
+                canvas.height
+            );
+
+
+            canvas.toBlob(
+                async blob => {
+
+                    if (!blob) {
+
+                        faceRegisterStatus.textContent =
+                            "Could not capture image.";
+
+                        return;
+                    }
+
+
+                    const formData =
+                        new FormData();
+
+
+                    formData.append(
+                        "image",
+                        blob,
+                        "face.jpg"
+                    );
+
+
+                    faceRegisterStatus.textContent =
+                        "Registering face...";
+
+
+                    captureFace.disabled =
+                        true;
+
+
+                    try {
+
+                        const response =
+                            await fetch(
+                                `${API_URL}/api/v1/face/enroll`,
+                                {
+                                    method: "POST",
+
+                                    headers: {
+                                        "Authorization":
+                                            `Bearer ${getToken()}`
+                                    },
+
+                                    body:
+                                        formData
+                                }
+                            );
+
+
+                        const result =
+                            await getResponseData(
+                                response
+                            );
+
+
+                        if (!response.ok) {
+
+                            throw new Error(
+                                result.detail ||
+                                "Face registration failed"
+                            );
+                        }
+
+
+                        faceRegisterStatus.textContent =
+                            "Face registered successfully!";
+
+
+                    } catch (error) {
+
+                        faceRegisterStatus.textContent =
+                            "Face registration failed: " +
+                            error.message;
+
+                    } finally {
+
+                        captureFace.disabled =
+                            false;
+                    }
+
+                },
+                "image/jpeg",
+                0.95
+            );
+        }
+    );
+
+
+// ==================================================
+// FACE LOGIN CAMERA
+// ==================================================
+
+const loginVideo =
+    document.getElementById(
+        "loginVideo"
+    );
+
+const startLoginCamera =
+    document.getElementById(
+        "startLoginCamera"
+    );
+
+const faceLoginButton =
+    document.getElementById(
+        "faceLoginButton"
+    );
+
+const faceLoginStatus =
+    document.getElementById(
+        "faceLoginStatus"
+    );
+
+const faceLoginUser =
+    document.getElementById(
+        "faceLoginUser"
+    );
+
+
+startLoginCamera
+    .addEventListener(
+        "click",
+        async () => {
+
+            stopAllStreams();
+
+            try {
+
+                loginStream =
+                    await navigator
+                        .mediaDevices
+                        .getUserMedia({
+                            video: true,
+                            audio: false
+                        });
+
+
+                loginVideo.srcObject =
+                    loginStream;
+
+
+                faceLoginButton.disabled =
+                    false;
+
+
+                faceLoginStatus.textContent =
+                    "Camera started. Look at the camera.";
+
+            } catch (error) {
+
+                faceLoginStatus.textContent =
+                    "Camera error: " +
+                    error.message;
+            }
+        }
+    );
+
+
+// ==================================================
+// FACE LOGIN
+// ==================================================
+
+faceLoginButton
+    .addEventListener(
+        "click",
+        async () => {
+
+            if (!loginStream) {
+
+                faceLoginStatus.textContent =
+                    "Start the camera first.";
+
+                return;
+            }
+
+
+            const canvas =
+                document.createElement(
+                    "canvas"
+                );
+
+
+            canvas.width =
+                loginVideo.videoWidth;
+
+            canvas.height =
+                loginVideo.videoHeight;
+
+
+            const context =
+                canvas.getContext(
+                    "2d"
+                );
+
+
+            context.drawImage(
+                loginVideo,
+                0,
+                0,
+                canvas.width,
+                canvas.height
+            );
+
+
+            canvas.toBlob(
+                async blob => {
+
+                    if (!blob) {
+
+                        faceLoginStatus.textContent =
+                            "Could not capture image.";
+
+                        return;
+                    }
+
+
+                    const formData =
+                        new FormData();
+
+
+                    formData.append(
+                        "image",
+                        blob,
+                        "face.jpg"
+                    );
+
+
+                    faceLoginStatus.textContent =
+                        "Recognizing face...";
+
+
+                    faceLoginButton.disabled =
+                        true;
+
+
+                    try {
+
+                        const response =
+                            await fetch(
+                                `${API_URL}/api/v1/face/login`,
+                                {
+                                    method: "POST",
+
+                                    body:
+                                        formData
+                                }
+                            );
+
+
+                        const result =
+                            await getResponseData(
+                                response
+                            );
+
+
+                        if (!response.ok) {
+
+                            throw new Error(
+                                result.detail ||
+                                "Face login failed"
+                            );
+                        }
+
+
+                        // Store JWT
+                        saveToken(
+                            result.access_token
+                        );
+
+
+                        faceLoginStatus.textContent =
+                            "Face login successful!";
+
+
+                        faceLoginUser.style.display =
+                            "block";
+
+
+                        faceLoginUser.innerHTML =
+                            `
+                            <strong>
+                                Welcome ${result.user.name}
+                            </strong>
+
+                            <br><br>
+
+                            Email:
+                            ${result.user.email}
+
+                            <br>
+
+                            User ID:
+                            ${result.user.id}
+
+                            <br>
+
+                            Similarity:
+                            ${result.similarity}
+                            `;
+
+
+                    } catch (error) {
+
+                        faceLoginStatus.textContent =
+                            "Face login failed: " +
+                            error.message;
+
+                    } finally {
+
+                        faceLoginButton.disabled =
+                            false;
+                    }
+
+                },
+                "image/jpeg",
+                0.95
+            );
+        }
+    );
+
+
+// ==================================================
+// LOGOUT
+// ==================================================
+
+document
+    .getElementById("logoutButton")
+    .addEventListener(
+        "click",
+        () => {
+
+            clearToken();
+            stopAllStreams();
+
+            document
+                .getElementById(
+                    "loginStatus"
+                )
+                .textContent =
+                "Logged out.";
+
+            document
+                .getElementById(
+                    "faceLoginStatus"
+                )
+                .textContent =
+                "Logged out.";
+
+        }
+    );
+
+</script>
+
+</body>
+</html>
