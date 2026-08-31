@@ -3,11 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes.auth import router as auth_router
 from app.api.routes.face import router as face_router
+from app.api.routes.door import router as door_router
 
 
 app = FastAPI(
     title="User Authentication API",
-    version="1.0.0"
+    version="1.0.0",
 )
 
 
@@ -33,6 +34,7 @@ app.add_middleware(
 
 app.include_router(auth_router)
 app.include_router(face_router)
+app.include_router(door_router)
 
 
 # --------------------------------------------------
