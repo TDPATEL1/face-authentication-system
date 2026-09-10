@@ -1,10 +1,13 @@
 import logging
 import threading
 
+from app.core.config import settings
 from app.services.door_controller import (
     DoorController,
     SimulationDoorController,
 )
+from app.services.esp32_controller import ESP32DoorController
+
 
 logger = logging.getLogger(__name__)
 
@@ -13,8 +16,14 @@ class DoorService:
     """
     High-level door business logic.
 
-    The controller handles the actual hardware.
-    DoorService handles timing and application logic.
+    DoorService handles:
+    - Controller selection
+    - Door unlock timing
+    - Door locking
+    - Door state
+
+    The actual hardware communication is handled by
+    the selected DoorController implementation.
     """
 
     def __init__(
@@ -22,11 +31,40 @@ class DoorService:
         controller: DoorController | None = None,
         unlock_duration: float = 5.0,
     ):
-        self.controller = controller or SimulationDoorController()
+        self.controller = controller or self._create_controller()
         self.unlock_duration = unlock_duration
 
         self._timer: threading.Timer | None = None
         self._lock = threading.Lock()
+
+    def _create_controller(self) -> DoorController:
+        """
+        Create the configured door controller.
+        """
+
+        controller_type = settings.DOOR_CONTROLLER.lower().strip()
+
+        if controller_type == "esp32":
+            logger.info(
+                "Using ESP32 door controller: %s",
+                settings.ESP32_IP,
+            )
+
+            return ESP32DoorController(
+                esp32_ip=settings.ESP32_IP,
+                timeout=settings.ESP32_TIMEOUT,
+            )
+
+        if controller_type == "simulation":
+            logger.info(
+                "Using simulation door controller"
+            )
+
+            return SimulationDoorController()
+
+        raise ValueError(
+            f"Unsupported DOOR_CONTROLLER: {settings.DOOR_CONTROLLER}"
+        )
 
     def unlock(self) -> bool:
         """

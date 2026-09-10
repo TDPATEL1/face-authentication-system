@@ -7,215 +7,95 @@
     <title>Face Authentication System</title>
 
     <style>
-        /* =========================================================
-           RESET
-        ========================================================= */
-
         * {
             box-sizing: border-box;
         }
 
         body {
             margin: 0;
-            min-height: 100vh;
+            padding: 0;
             font-family: Arial, Helvetica, sans-serif;
             background: #f4f6f8;
             color: #222;
         }
 
-        button,
-        input {
-            font: inherit;
-        }
-
-        button {
-            cursor: pointer;
-        }
-
-
-        /* =========================================================
-           MAIN CONTAINER
-        ========================================================= */
-
         .container {
-            width: 100%;
-            max-width: 950px;
-            margin: 40px auto;
-            padding: 20px;
+            width: 95%;
+            max-width: 900px;
+            margin: 30px auto;
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
         }
 
-        .header {
+        h1 {
             text-align: center;
-            margin-bottom: 30px;
-        }
-
-        .header h1 {
-            margin: 0 0 10px;
-            font-size: 32px;
-        }
-
-        .header p {
-            margin: 0;
-            color: #666;
-        }
-
-
-        /* =========================================================
-           AUTHENTICATION STATE
-        ========================================================= */
-
-        .auth-state {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 20px;
-            font-size: 14px;
-        }
-
-        .auth-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: #999;
-        }
-
-        .auth-dot.logged-in {
-            background: #2e7d32;
-        }
-
-
-        /* =========================================================
-           TABS
-        ========================================================= */
-
-        .tabs {
-            display: flex;
-            justify-content: center;
-            gap: 8px;
-            flex-wrap: wrap;
             margin-bottom: 25px;
         }
 
-        .tab {
-            padding: 11px 17px;
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+        }
+
+        .tab-button {
+            flex: 1;
+            min-width: 140px;
+            padding: 12px;
             border: none;
-            border-radius: 8px;
-            background: #ddd;
-            color: #333;
-            transition: 0.2s;
+            border-radius: 7px;
+            cursor: pointer;
+            background: #e9ecef;
+            font-size: 15px;
         }
 
-        .tab:hover {
-            background: #ccc;
-        }
-
-        .tab.active {
+        .tab-button.active {
             background: #222;
             color: white;
         }
 
-
-        /* =========================================================
-           SECTIONS
-        ========================================================= */
-
         .section {
             display: none;
-            background: white;
-            padding: 30px;
-            border-radius: 14px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
         }
 
         .section.active {
             display: block;
         }
 
-        .section h2 {
-            margin-top: 0;
-            margin-bottom: 10px;
-        }
-
-        .info {
-            color: #666;
-            margin-bottom: 25px;
-            line-height: 1.5;
-        }
-
-
-        /* =========================================================
-           FORMS
-        ========================================================= */
-
         .form-group {
-            margin-bottom: 16px;
+            margin-bottom: 15px;
         }
 
-        .form-group label {
+        label {
             display: block;
             margin-bottom: 6px;
-            font-size: 14px;
             font-weight: bold;
         }
 
         input {
             width: 100%;
-            padding: 13px;
+            padding: 11px;
             border: 1px solid #ccc;
-            border-radius: 8px;
-            outline: none;
-            transition: border 0.2s;
+            border-radius: 6px;
+            font-size: 15px;
         }
 
-        input:focus {
-            border-color: #555;
-        }
-
-
-        /* =========================================================
-           BUTTONS
-        ========================================================= */
-
-        .button-row {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
-            margin-top: 20px;
-        }
-
-        .primary-btn {
-            padding: 12px 20px;
+        button {
+            padding: 11px 18px;
             border: none;
-            border-radius: 8px;
+            border-radius: 6px;
+            cursor: pointer;
             background: #222;
             color: white;
+            font-size: 15px;
+            margin: 5px 5px 5px 0;
         }
 
-        .primary-btn:hover {
-            opacity: 0.85;
-        }
-
-        .secondary-btn {
-            padding: 12px 20px;
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            background: white;
-            color: #222;
-        }
-
-        .secondary-btn:hover {
-            background: #f0f0f0;
-        }
-
-        .danger-btn {
-            padding: 12px 20px;
-            border: none;
-            border-radius: 8px;
-            background: #c62828;
-            color: white;
+        button:hover {
+            opacity: 0.9;
         }
 
         button:disabled {
@@ -223,1997 +103,1822 @@
             cursor: not-allowed;
         }
 
-
-        /* =========================================================
-           STATUS MESSAGE
-        ========================================================= */
-
-        .status {
-            margin-top: 20px;
-            padding: 12px;
-            border-radius: 8px;
-            text-align: center;
-            font-size: 14px;
-            min-height: 20px;
-        }
-
-        .status:empty {
-            display: none;
-        }
-
-        .status.success {
-            background: #e8f5e9;
-            color: #2e7d32;
-        }
-
-        .status.error {
-            background: #ffebee;
-            color: #c62828;
-        }
-
-        .status.info {
-            background: #e3f2fd;
-            color: #1565c0;
-        }
-
-
-        /* =========================================================
-           USER INFO
-        ========================================================= */
-
-        .user-info {
-            margin-top: 20px;
-            padding: 18px;
-            border-radius: 10px;
-            background: #f5f5f5;
-            line-height: 1.7;
-        }
-
-
-        /* =========================================================
-           CAMERA
-        ========================================================= */
-
         .camera-container {
+            margin-top: 20px;
             text-align: center;
-        }
-
-        .video-wrapper {
-            position: relative;
-            width: 100%;
-            max-width: 640px;
-            margin: 20px auto;
-            overflow: hidden;
-            border-radius: 14px;
-            background: #111;
         }
 
         video {
             width: 100%;
-            display: block;
+            max-width: 640px;
+            min-height: 360px;
             background: #111;
+            border-radius: 10px;
+            object-fit: cover;
         }
 
-        .camera-placeholder {
-            position: absolute;
-            inset: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            color: #aaa;
-            font-size: 15px;
-            pointer-events: none;
-        }
-
-        .camera-placeholder.hidden {
+        canvas {
             display: none;
         }
 
-        .camera-help {
-            margin-top: 10px;
-            color: #666;
-            font-size: 14px;
-        }
-
-
-        /* =========================================================
-           STEP INFORMATION
-        ========================================================= */
-
-        .steps {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-            margin: 20px 0 25px;
-        }
-
-        .step {
+        .status {
+            margin-top: 15px;
             padding: 12px;
+            border-radius: 6px;
+            background: #f1f3f5;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .success {
+            background: #d1e7dd;
+            color: #0f5132;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #842029;
+        }
+
+        .info {
+            background: #cff4fc;
+            color: #055160;
+        }
+
+        .warning {
+            background: #fff3cd;
+            color: #664d03;
+        }
+
+        .user-info {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
             border-radius: 8px;
-            background: #f2f2f2;
-            text-align: center;
-            font-size: 13px;
         }
 
-        .step.active {
-            background: #222;
-            color: white;
+        .hidden {
+            display: none !important;
         }
 
-
-        /* =========================================================
-           FOOTER
-        ========================================================= */
-
-        .footer {
-            text-align: center;
-            margin-top: 30px;
+        .instruction {
+            padding: 12px;
+            margin: 15px 0;
+            background: #f8f9fa;
+            border-left: 4px solid #222;
+            border-radius: 5px;
         }
 
-
-        /* =========================================================
-           RESPONSIVE
-        ========================================================= */
-
-        @media (max-width: 650px) {
-
-            .container {
-                margin: 15px auto;
-                padding: 12px;
-            }
-
-            .section {
-                padding: 20px;
-            }
-
-            .header h1 {
-                font-size: 26px;
-            }
-
-            .steps {
-                grid-template-columns: 1fr;
-            }
-
-            .tab {
-                width: 100%;
-            }
-
-            .button-row button {
-                width: 100%;
-            }
+        .debug {
+            margin-top: 20px;
+            padding: 12px;
+            background: #111;
+            color: #00ff88;
+            border-radius: 6px;
+            font-family: Consolas, monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 250px;
+            overflow-y: auto;
         }
     </style>
 </head>
-
 
 <body>
 
 <div class="container">
 
-    <!-- =========================================================
-         HEADER
-    ========================================================== -->
+    <h1>Face Authentication System</h1>
 
-    <header class="header">
+    <!-- ========================================================= -->
+    <!-- TABS -->
+    <!-- ========================================================= -->
 
-        <h1>Face Authentication System</h1>
-
-        <p>
-            Secure authentication using password and face recognition
-        </p>
-
-    </header>
-
-
-    <!-- =========================================================
-         LOGIN STATE
-    ========================================================== -->
-
-    <div class="auth-state">
-
-        <span
-            id="authDot"
-            class="auth-dot">
-        </span>
-
-        <span id="authText">
-            Not logged in
-        </span>
-
-    </div>
-
-
-    <!-- =========================================================
-         NAVIGATION
-    ========================================================== -->
-
-    <nav class="tabs">
+    <div class="tabs">
 
         <button
-            class="tab active"
-            data-target="registerSection">
+            type="button"
+            class="tab-button active"
+            data-section="register-section">
             Register
         </button>
 
         <button
-            class="tab"
-            data-target="loginSection">
-            Login
+            type="button"
+            class="tab-button"
+            data-section="login-section">
+            Password Login
         </button>
 
         <button
-            class="tab"
-            data-target="faceRegisterSection">
+            type="button"
+            class="tab-button"
+            data-section="face-register-section">
             Face Register
         </button>
 
         <button
-            class="tab"
-            data-target="faceLoginSection">
+            type="button"
+            class="tab-button"
+            data-section="face-login-section">
             Face Login
         </button>
 
-    </nav>
+    </div>
 
 
-    <!-- =========================================================
-         REGISTER
-    ========================================================== -->
+    <!-- ========================================================= -->
+    <!-- REGISTER -->
+    <!-- ========================================================= -->
 
-    <section
-        id="registerSection"
-        class="section active">
+    <section id="register-section" class="section active">
 
         <h2>Create Account</h2>
 
-        <p class="info">
-            Create your account first. After successful registration,
-            you can login and register your face.
-        </p>
-
-        <form id="registerForm">
+        <form id="register-form">
 
             <div class="form-group">
-
-                <label for="registerName">
-                    Full Name
-                </label>
+                <label for="register-name">Name</label>
 
                 <input
                     type="text"
-                    id="registerName"
-                    placeholder="Enter your full name"
-                    autocomplete="name"
+                    id="register-name"
                     required>
-
             </div>
 
-
             <div class="form-group">
-
-                <label for="registerEmail">
-                    Email
-                </label>
+                <label for="register-email">Email</label>
 
                 <input
                     type="email"
-                    id="registerEmail"
-                    placeholder="Enter your email"
-                    autocomplete="email"
+                    id="register-email"
                     required>
-
             </div>
 
-
             <div class="form-group">
-
-                <label for="registerPassword">
-                    Password
-                </label>
+                <label for="register-password">Password</label>
 
                 <input
                     type="password"
-                    id="registerPassword"
-                    placeholder="Create a password"
-                    autocomplete="new-password"
+                    id="register-password"
                     required>
-
             </div>
 
-
-            <div class="button-row">
-
-                <button
-                    type="submit"
-                    id="registerButton"
-                    class="primary-btn">
-
-                    Create Account
-
-                </button>
-
-            </div>
+            <button type="submit">
+                Register
+            </button>
 
         </form>
 
-
-        <div
-            id="registerStatus"
-            class="status">
-        </div>
+        <div id="register-status" class="status hidden"></div>
 
     </section>
 
 
-    <!-- =========================================================
-         PASSWORD LOGIN
-    ========================================================== -->
+    <!-- ========================================================= -->
+    <!-- PASSWORD LOGIN -->
+    <!-- ========================================================= -->
 
-    <section
-        id="loginSection"
-        class="section">
+    <section id="login-section" class="section">
 
-        <h2>Login</h2>
+        <h2>Password Login</h2>
 
-        <p class="info">
-            Login with your email and password.
-        </p>
-
-        <form id="loginForm">
+        <form id="login-form">
 
             <div class="form-group">
-
-                <label for="loginEmail">
-                    Email
-                </label>
+                <label for="login-email">Email</label>
 
                 <input
                     type="email"
-                    id="loginEmail"
-                    placeholder="Enter your email"
-                    autocomplete="email"
+                    id="login-email"
                     required>
-
             </div>
 
-
             <div class="form-group">
-
-                <label for="loginPassword">
-                    Password
-                </label>
+                <label for="login-password">Password</label>
 
                 <input
                     type="password"
-                    id="loginPassword"
-                    placeholder="Enter your password"
-                    autocomplete="current-password"
+                    id="login-password"
                     required>
-
             </div>
 
-
-            <div class="button-row">
-
-                <button
-                    type="submit"
-                    id="loginButton"
-                    class="primary-btn">
-
-                    Login
-
-                </button>
-
-            </div>
+            <button type="submit">
+                Login
+            </button>
 
         </form>
 
-
-        <div
-            id="loginStatus"
-            class="status">
-        </div>
-
-
-        <div
-            id="loginUser"
-            class="user-info"
-            style="display: none;">
-
-        </div>
+        <div id="login-status" class="status hidden"></div>
 
     </section>
 
 
-    <!-- =========================================================
-         FACE REGISTER
-    ========================================================== -->
+    <!-- ========================================================= -->
+    <!-- FACE REGISTER -->
+    <!-- ========================================================= -->
 
-    <section
-        id="faceRegisterSection"
-        class="section">
+    <section id="face-register-section" class="section">
 
-        <h2>Register Your Face</h2>
+        <h2>Face Registration</h2>
 
-        <p class="info">
-            Your account must be logged in before registering your face.
-        </p>
-
-
-        <div class="steps">
-
-            <div
-                id="faceRegisterStep1"
-                class="step active">
-
-                1. Start Camera
-
-            </div>
-
-            <div
-                id="faceRegisterStep2"
-                class="step">
-
-                2. Position Face
-
-            </div>
-
-            <div
-                id="faceRegisterStep3"
-                class="step">
-
-                3. Capture Face
-
-            </div>
-
+        <div class="instruction">
+            You must be logged in with your password before registering
+            your face.
         </div>
 
+        <div>
+
+            <button
+                type="button"
+                id="start-face-register-camera">
+                Start Camera
+            </button>
+
+            <button
+                type="button"
+                id="capture-face-register"
+                disabled>
+                Capture & Register Face
+            </button>
+
+            <button
+                type="button"
+                id="stop-face-register-camera"
+                disabled>
+                Stop Camera
+            </button>
+
+        </div>
 
         <div class="camera-container">
 
-            <div class="video-wrapper">
+            <video
+                id="face-register-video"
+                autoplay
+                playsinline>
+            </video>
 
-                <video
-                    id="registerVideo"
-                    autoplay
-                    muted
-                    playsinline>
-                </video>
-
-                <div
-                    id="registerPlaceholder"
-                    class="camera-placeholder">
-
-                    Camera is not started
-
-                </div>
-
-            </div>
-
-
-            <div class="button-row">
-
-                <button
-                    id="startRegisterCamera"
-                    class="primary-btn">
-
-                    Start Camera
-
-                </button>
-
-
-                <button
-                    id="captureFace"
-                    class="secondary-btn"
-                    disabled>
-
-                    Capture & Register Face
-
-                </button>
-
-            </div>
-
-
-            <p class="camera-help">
-                Keep your face centered and look directly at the camera.
-            </p>
+            <canvas
+                id="face-register-canvas">
+            </canvas>
 
         </div>
 
-
         <div
-            id="faceRegisterStatus"
-            class="status">
+            id="face-register-status"
+            class="status hidden">
         </div>
 
     </section>
 
 
-    <!-- =========================================================
-         FACE LOGIN
-    ========================================================== -->
+    <!-- ========================================================= -->
+    <!-- FACE LOGIN -->
+    <!-- ========================================================= -->
 
-    <section
-        id="faceLoginSection"
-        class="section">
+    <section id="face-login-section" class="section">
 
-        <h2>Login with Face ID</h2>
+        <h2>Face Login With Liveness Detection</h2>
 
-        <p class="info">
-            Start the camera and look directly at it to authenticate.
-        </p>
+        <div class="instruction">
+            <strong>Instructions:</strong><br>
+            1. Start the camera.<br>
+            2. Click "Capture & Login".<br>
+            3. The system will automatically start a liveness session.<br>
+            4. Slowly move your head slightly left and right.<br>
+            5. After liveness passes, the system will perform face login.
+        </div>
 
+        <div>
+
+            <button
+                type="button"
+                id="start-face-login-camera">
+                Start Camera
+            </button>
+
+            <button
+                type="button"
+                id="face-login-button"
+                disabled>
+                Capture & Login
+            </button>
+
+            <button
+                type="button"
+                id="stop-face-login-camera"
+                disabled>
+                Stop Camera
+            </button>
+
+        </div>
 
         <div class="camera-container">
 
-            <div class="video-wrapper">
+            <video
+                id="face-login-video"
+                autoplay
+                playsinline>
+            </video>
 
-                <video
-                    id="loginVideo"
-                    autoplay
-                    muted
-                    playsinline>
-                </video>
-
-                <div
-                    id="loginPlaceholder"
-                    class="camera-placeholder">
-
-                    Camera is not started
-
-                </div>
-
-            </div>
-
-
-            <div class="button-row">
-
-                <button
-                    id="startLoginCamera"
-                    class="primary-btn">
-
-                    Start Camera
-
-                </button>
-
-
-                <button
-                    id="faceLoginButton"
-                    class="secondary-btn"
-                    disabled>
-
-                    Login with Face
-
-                </button>
-
-            </div>
-
-
-            <p class="camera-help">
-                Make sure your face is clearly visible before authenticating.
-            </p>
+            <canvas
+                id="face-login-canvas">
+            </canvas>
 
         </div>
 
-
         <div
-            id="faceLoginStatus"
-            class="status">
+            id="face-login-status"
+            class="status hidden">
         </div>
 
-
         <div
-            id="faceLoginUser"
-            class="user-info"
-            style="display: none;">
-
+            id="face-login-user"
+            class="user-info hidden">
         </div>
 
     </section>
 
 
-    <!-- =========================================================
-         LOGOUT
-    ========================================================== -->
+    <!-- ========================================================= -->
+    <!-- DEBUG -->
+    <!-- ========================================================= -->
 
-    <footer class="footer">
-
-        <button
-            id="logoutButton"
-            class="danger-btn">
-
-            Logout
-
-        </button>
-
-    </footer>
+    <div
+        id="debug-output"
+        class="debug">
+        Frontend loaded.
+    </div>
 
 </div>
 
 
 <script>
 
-"use strict";
+    // ============================================================
+    // CONFIGURATION
+    // ============================================================
+
+    const API_URL = "http://127.0.0.1:8000";
+
+    const ACCESS_TOKEN_KEY = "access_token";
 
 
-/* ================================================================
-   CONFIGURATION
-================================================================ */
+    // ============================================================
+    // GLOBAL VARIABLES
+    // ============================================================
 
-const API_URL = "http://127.0.0.1:8000";
+    let faceRegisterStream = null;
+    let faceLoginStream = null;
 
+    let livenessSessionId = null;
 
-/* ================================================================
-   DOM HELPERS
-================================================================ */
-
-const $ = (id) => document.getElementById(id);
-
-const tabs = document.querySelectorAll(".tab");
-
-const sections = document.querySelectorAll(".section");
+    let livenessRunning = false;
 
 
-/* ================================================================
-   TOKEN MANAGEMENT
-================================================================ */
+    // ============================================================
+    // DOM HELPERS
+    // ============================================================
 
-function getToken() {
-
-    return localStorage.getItem("access_token");
-
-}
-
-
-function saveToken(token) {
-
-    localStorage.setItem(
-        "access_token",
-        token
-    );
-
-    updateAuthState();
-
-}
-
-
-function clearToken() {
-
-    localStorage.removeItem(
-        "access_token"
-    );
-
-    updateAuthState();
-
-}
-
-
-/* ================================================================
-   RESPONSE HANDLING
-================================================================ */
-
-async function getResponseData(response) {
-
-    const text = await response.text();
-
-    if (!text) {
-        return {};
+    function $(id) {
+        return document.getElementById(id);
     }
 
-    try {
 
-        return JSON.parse(text);
+    function showStatus(elementId, message, type = "info") {
 
-    } catch {
+        const element = $(elementId);
 
-        return {
-            detail: text
-        };
-
-    }
-
-}
-
-
-/* ================================================================
-   STATUS MESSAGE
-================================================================ */
-
-function setStatus(element, message, type = "info") {
-
-    element.textContent = message;
-
-    element.className = "status";
-
-    if (message) {
-        element.classList.add(type);
-    }
-
-}
-
-
-function clearStatus(element) {
-
-    element.textContent = "";
-
-    element.className = "status";
-
-}
-
-
-/* ================================================================
-   BUTTON LOADING STATE
-================================================================ */
-
-function setButtonLoading(button, loading, loadingText) {
-
-    if (loading) {
-
-        button.dataset.originalText =
-            button.textContent;
-
-        button.textContent =
-            loadingText;
-
-        button.disabled = true;
-
-    } else {
-
-        button.textContent =
-            button.dataset.originalText ||
-            button.textContent;
-
-        button.disabled = false;
-
-    }
-
-}
-
-
-/* ================================================================
-   AUTH STATE UI
-================================================================ */
-
-function updateAuthState() {
-
-    const loggedIn =
-        Boolean(getToken());
-
-    if (loggedIn) {
-
-        $("authDot")
-            .classList
-            .add("logged-in");
-
-        $("authText").textContent =
-            "Logged in";
-
-    } else {
-
-        $("authDot")
-            .classList
-            .remove("logged-in");
-
-        $("authText").textContent =
-            "Not logged in";
-
-    }
-
-}
-
-
-/* ================================================================
-   TAB NAVIGATION
-================================================================ */
-
-function openSection(sectionId) {
-
-    tabs.forEach(tab => {
-
-        tab.classList.toggle(
-            "active",
-            tab.dataset.target === sectionId
-        );
-
-    });
-
-
-    sections.forEach(section => {
-
-        section.classList.toggle(
-            "active",
-            section.id === sectionId
-        );
-
-    });
-
-
-    /*
-     * Stop cameras when leaving a section.
-     */
-    if (sectionId !== "faceRegisterSection") {
-
-        stopRegisterCamera();
-
-    }
-
-    if (sectionId !== "faceLoginSection") {
-
-        stopLoginCamera();
-
-    }
-
-}
-
-
-tabs.forEach(tab => {
-
-    tab.addEventListener(
-        "click",
-        () => {
-
-            openSection(
-                tab.dataset.target
-            );
-
-        }
-    );
-
-});
-
-
-/* ================================================================
-   REGISTER ACCOUNT
-================================================================ */
-
-$("registerForm").addEventListener(
-    "submit",
-    async (event) => {
-
-        event.preventDefault();
-
-        const status =
-            $("registerStatus");
-
-        const button =
-            $("registerButton");
-
-
-        clearStatus(status);
-
-
-        const name =
-            $("registerName")
-                .value
-                .trim();
-
-        const email =
-            $("registerEmail")
-                .value
-                .trim();
-
-        const password =
-            $("registerPassword")
-                .value;
-
-
-        if (!name || !email || !password) {
-
-            setStatus(
-                status,
-                "Please fill in all fields.",
-                "error"
-            );
-
+        if (!element) {
             return;
         }
 
+        element.textContent = message;
 
-        setButtonLoading(
-            button,
-            true,
-            "Creating Account..."
-        );
+        element.className = `status ${type}`;
 
+        element.classList.remove("hidden");
+    }
+
+
+    function hideStatus(elementId) {
+
+        const element = $(elementId);
+
+        if (!element) {
+            return;
+        }
+
+        element.classList.add("hidden");
+    }
+
+
+    function debug(message) {
+
+        const element = $("debug-output");
+
+        if (!element) {
+            return;
+        }
+
+        const timestamp =
+            new Date().toLocaleTimeString();
+
+        element.textContent +=
+            `\n[${timestamp}] ${message}`;
+
+        element.scrollTop =
+            element.scrollHeight;
+
+        console.log(message);
+    }
+
+
+    // ============================================================
+    // ERROR HANDLING
+    // ============================================================
+
+    async function getErrorMessage(response) {
+
+        let errorMessage =
+            `HTTP ${response.status} ${response.statusText}`;
 
         try {
 
-            const response =
-                await fetch(
-                    `${API_URL}/api/v1/auth/register`,
-                    {
-                        method: "POST",
+            const data =
+                await response.json();
 
-                        headers: {
-                            "Content-Type":
-                                "application/json"
-                        },
-
-                        body:
-                            JSON.stringify({
-                                name,
-                                email,
-                                password
-                            })
-                    }
-                );
-
-
-            const result =
-                await getResponseData(
-                    response
-                );
-
-
-            if (!response.ok) {
-
-                throw new Error(
-                    result.detail ||
-                    "Registration failed."
-                );
-
-            }
-
-
-            setStatus(
-                status,
-                "Account created successfully! Opening login...",
-                "success"
+            debug(
+                "Backend error response: " +
+                JSON.stringify(data)
             );
 
+            if (data.detail !== undefined) {
 
-            $("registerForm").reset();
+                if (
+                    typeof data.detail === "string"
+                ) {
 
+                    errorMessage =
+                        data.detail;
 
-            /*
-             * Automatically move to Login.
-             */
-            setTimeout(
-                () => {
+                } else {
 
-                    $("loginEmail").value =
-                        email;
-
-                    openSection(
-                        "loginSection"
-                    );
-
-                    setStatus(
-                        $("loginStatus"),
-                        "Account created. Please login.",
-                        "success"
-                    );
-
-                },
-                700
-            );
-
-
-        } catch (error) {
-
-            setStatus(
-                status,
-                `Registration failed: ${error.message}`,
-                "error"
-            );
-
-        } finally {
-
-            setButtonLoading(
-                button,
-                false
-            );
-
-        }
-
-    }
-);
-
-
-/* ================================================================
-   PASSWORD LOGIN
-================================================================ */
-
-$("loginForm").addEventListener(
-    "submit",
-    async (event) => {
-
-        event.preventDefault();
-
-        const status =
-            $("loginStatus");
-
-        const button =
-            $("loginButton");
-
-
-        clearStatus(status);
-
-        $("loginUser").style.display =
-            "none";
-
-
-        const email =
-            $("loginEmail")
-                .value
-                .trim();
-
-        const password =
-            $("loginPassword")
-                .value;
-
-
-        setButtonLoading(
-            button,
-            true,
-            "Logging in..."
-        );
-
-
-        try {
-
-            const response =
-                await fetch(
-                    `${API_URL}/api/v1/auth/login`,
-                    {
-                        method: "POST",
-
-                        headers: {
-                            "Content-Type":
-                                "application/json"
-                        },
-
-                        body:
-                            JSON.stringify({
-                                email,
-                                password
-                            })
-                    }
-                );
-
-
-            const result =
-                await getResponseData(
-                    response
-                );
-
-
-            if (!response.ok) {
-
-                throw new Error(
-                    result.detail ||
-                    "Login failed."
-                );
-
-            }
-
-
-            if (!result.access_token) {
-
-                throw new Error(
-                    "Server did not return an access token."
-                );
-
-            }
-
-
-            saveToken(
-                result.access_token
-            );
-
-
-            setStatus(
-                status,
-                "Login successful!",
-                "success"
-            );
-
-
-            $("loginUser").style.display =
-                "block";
-
-            $("loginUser").innerHTML = `
-                <strong>Login successful</strong>
-                <br>
-                You are now authenticated.
-                <br><br>
-                You can register your face or use Face Login.
-            `;
-
-
-            /*
-             * Automatically continue to
-             * Face Registration.
-             */
-            setTimeout(
-                () => {
-
-                    openSection(
-                        "faceRegisterSection"
-                    );
-
-                    setStatus(
-                        $("faceRegisterStatus"),
-                        "You are logged in. Start the camera to register your face.",
-                        "success"
-                    );
-
-                },
-                800
-            );
-
-
-        } catch (error) {
-
-            setStatus(
-                status,
-                `Login failed: ${error.message}`,
-                "error"
-            );
-
-        } finally {
-
-            setButtonLoading(
-                button,
-                false
-            );
-
-        }
-
-    }
-);
-
-
-/* ================================================================
-   CAMERA STREAM MANAGEMENT
-================================================================ */
-
-let registerStream = null;
-
-let loginStream = null;
-
-
-function stopStream(stream) {
-
-    if (!stream) {
-        return null;
-    }
-
-    stream
-        .getTracks()
-        .forEach(track => track.stop());
-
-    return null;
-
-}
-
-
-/* ================================================================
-   REGISTER CAMERA
-================================================================ */
-
-async function startRegisterCameraStream() {
-
-    const status =
-        $("faceRegisterStatus");
-
-    try {
-
-        /*
-         * Stop any previous stream first.
-         */
-        registerStream =
-            stopStream(registerStream);
-
-
-        registerStream =
-            await navigator
-                .mediaDevices
-                .getUserMedia({
-                    video: {
-                        facingMode: "user",
-                        width: {
-                            ideal: 640
-                        },
-                        height: {
-                            ideal: 480
-                        }
-                    },
-                    audio: false
-                });
-
-
-        $("registerVideo").srcObject =
-            registerStream;
-
-
-        $("registerPlaceholder")
-            .classList
-            .add("hidden");
-
-
-        $("captureFace").disabled =
-            false;
-
-
-        $("faceRegisterStep1")
-            .classList
-            .remove("active");
-
-        $("faceRegisterStep2")
-            .classList
-            .add("active");
-
-
-        setStatus(
-            status,
-            "Camera started. Position your face in the center.",
-            "info"
-        );
-
-
-    } catch (error) {
-
-        setStatus(
-            status,
-            `Camera error: ${error.message}`,
-            "error"
-        );
-
-    }
-
-}
-
-
-$("startRegisterCamera").addEventListener(
-    "click",
-    async () => {
-
-        if (!getToken()) {
-
-            setStatus(
-                $("faceRegisterStatus"),
-                "Please login first before registering your face.",
-                "error"
-            );
-
-            openSection(
-                "loginSection"
-            );
-
-            return;
-        }
-
-
-        await startRegisterCameraStream();
-
-    }
-);
-
-
-/* ================================================================
-   CAPTURE FACE FOR ENROLLMENT
-================================================================ */
-
-$("captureFace").addEventListener(
-    "click",
-    async () => {
-
-        const status =
-            $("faceRegisterStatus");
-
-        const button =
-            $("captureFace");
-
-        const video =
-            $("registerVideo");
-
-
-        if (!getToken()) {
-
-            setStatus(
-                status,
-                "Your login session is missing. Please login again.",
-                "error"
-            );
-
-            openSection(
-                "loginSection"
-            );
-
-            return;
-        }
-
-
-        if (!registerStream) {
-
-            setStatus(
-                status,
-                "Please start the camera first.",
-                "error"
-            );
-
-            return;
-        }
-
-
-        if (
-            !video.videoWidth ||
-            !video.videoHeight
-        ) {
-
-            setStatus(
-                status,
-                "Camera is not ready yet. Please wait a moment.",
-                "error"
-            );
-
-            return;
-        }
-
-
-        button.disabled = true;
-
-
-        setStatus(
-            status,
-            "Capturing face...",
-            "info"
-        );
-
-
-        try {
-
-            const canvas =
-                document.createElement(
-                    "canvas"
-                );
-
-
-            canvas.width =
-                video.videoWidth;
-
-            canvas.height =
-                video.videoHeight;
-
-
-            const context =
-                canvas.getContext("2d");
-
-
-            context.drawImage(
-                video,
-                0,
-                0,
-                canvas.width,
-                canvas.height
-            );
-
-
-            const blob =
-                await new Promise(
-                    resolve => {
-
-                        canvas.toBlob(
-                            resolve,
-                            "image/jpeg",
-                            0.90
+                    errorMessage =
+                        JSON.stringify(
+                            data.detail,
+                            null,
+                            2
                         );
-
-                    }
-                );
-
-
-            if (!blob) {
-
-                throw new Error(
-                    "Could not create image."
-                );
-
-            }
-
-
-            const formData =
-                new FormData();
-
-
-            /*
-             * IMPORTANT:
-             *
-             * Your backend enrollment route
-             * expects "file" according to
-             * the audit.
-             *
-             * Therefore we send "file" here.
-             *
-             * If your backend has been changed
-             * to expect "image", change this
-             * one line.
-             */
-            formData.append(
-                "file",
-                blob,
-                "face.jpg"
-            );
-
-
-            setStatus(
-                status,
-                "Registering your face...",
-                "info"
-            );
-
-
-            const response =
-                await fetch(
-                    `${API_URL}/api/v1/face/enroll`,
-                    {
-                        method: "POST",
-
-                        headers: {
-                            "Authorization":
-                                `Bearer ${getToken()}`
-                        },
-
-                        body:
-                            formData
-                    }
-                );
-
-
-            const result =
-                await getResponseData(
-                    response
-                );
-
-
-            if (!response.ok) {
-
-                throw new Error(
-                    result.detail ||
-                    "Face registration failed."
-                );
-
-            }
-
-
-            setStatus(
-                status,
-                "Face registered successfully!",
-                "success"
-            );
-
-
-            $("faceRegisterStep2")
-                .classList
-                .remove("active");
-
-            $("faceRegisterStep3")
-                .classList
-                .add("active");
-
-
-            /*
-             * Stop camera after successful
-             * enrollment.
-             */
-            stopRegisterCamera();
-
-
-            /*
-             * Move to Face Login.
-             */
-            setTimeout(
-                () => {
-
-                    openSection(
-                        "faceLoginSection"
-                    );
-
-                    setStatus(
-                        $("faceLoginStatus"),
-                        "Your face is registered. Start the camera to test Face Login.",
-                        "success"
-                    );
-
-                },
-                900
-            );
-
-
-        } catch (error) {
-
-            setStatus(
-                status,
-                `Face registration failed: ${error.message}`,
-                "error"
-            );
-
-        } finally {
-
-            button.disabled =
-                false;
-
-        }
-
-    }
-);
-
-
-/* ================================================================
-   STOP REGISTER CAMERA
-================================================================ */
-
-function stopRegisterCamera() {
-
-    registerStream =
-        stopStream(registerStream);
-
-
-    $("registerVideo").srcObject =
-        null;
-
-
-    $("captureFace").disabled =
-        true;
-
-
-    $("registerPlaceholder")
-        .classList
-        .remove("hidden");
-
-}
-
-
-/* ================================================================
-   FACE LOGIN CAMERA
-================================================================ */
-
-async function startLoginCameraStream() {
-
-    const status =
-        $("faceLoginStatus");
-
-
-    try {
-
-        loginStream =
-            stopStream(loginStream);
-
-
-        loginStream =
-            await navigator
-                .mediaDevices
-                .getUserMedia({
-                    video: {
-                        facingMode: "user",
-                        width: {
-                            ideal: 640
-                        },
-                        height: {
-                            ideal: 480
-                        }
-                    },
-                    audio: false
-                });
-
-
-        $("loginVideo").srcObject =
-            loginStream;
-
-
-        $("loginPlaceholder")
-            .classList
-            .add("hidden");
-
-
-        $("faceLoginButton").disabled =
-            false;
-
-
-        setStatus(
-            status,
-            "Camera started. Look directly at the camera.",
-            "info"
-        );
-
-
-    } catch (error) {
-
-        setStatus(
-            status,
-            `Camera error: ${error.message}`,
-            "error"
-        );
-
-    }
-
-}
-
-
-$("startLoginCamera").addEventListener(
-    "click",
-    async () => {
-
-        await startLoginCameraStream();
-
-    }
-);
-
-
-/* ================================================================
-   FACE LOGIN
-================================================================ */
-
-$("faceLoginButton").addEventListener(
-    "click",
-    async () => {
-
-        const status =
-            $("faceLoginStatus");
-
-        const button =
-            $("faceLoginButton");
-
-        const video =
-            $("loginVideo");
-
-
-        if (!loginStream) {
-
-            setStatus(
-                status,
-                "Please start the camera first.",
-                "error"
-            );
-
-            return;
-        }
-
-
-        if (
-            !video.videoWidth ||
-            !video.videoHeight
-        ) {
-
-            setStatus(
-                status,
-                "Camera is not ready yet. Please wait.",
-                "error"
-            );
-
-            return;
-        }
-
-
-        button.disabled =
-            true;
-
-
-        setStatus(
-            status,
-            "Recognizing your face...",
-            "info"
-        );
-
-
-        try {
-
-            const canvas =
-                document.createElement(
-                    "canvas"
-                );
-
-
-            canvas.width =
-                video.videoWidth;
-
-            canvas.height =
-                video.videoHeight;
-
-
-            const context =
-                canvas.getContext("2d");
-
-
-            context.drawImage(
-                video,
-                0,
-                0,
-                canvas.width,
-                canvas.height
-            );
-
-
-            const blob =
-                await new Promise(
-                    resolve => {
-
-                        canvas.toBlob(
-                            resolve,
-                            "image/jpeg",
-                            0.90
-                        );
-
-                    }
-                );
-
-
-            if (!blob) {
-
-                throw new Error(
-                    "Could not create image."
-                );
-
-            }
-
-
-            const formData =
-                new FormData();
-
-
-            formData.append(
-                "image",
-                blob,
-                "face.jpg"
-            );
-
-
-            const response =
-                await fetch(
-                    `${API_URL}/api/v1/face/login`,
-                    {
-                        method: "POST",
-
-                        body:
-                            formData
-                    }
-                );
-
-
-            const result =
-                await getResponseData(
-                    response
-                );
-
-
-            if (!response.ok) {
-
-                throw new Error(
-                    result.detail ||
-                    "Face login failed."
-                );
-
-            }
-
-
-            if (!result.access_token) {
-
-                throw new Error(
-                    "Server did not return an access token."
-                );
-
-            }
-
-
-            saveToken(
-                result.access_token
-            );
-
-
-            setStatus(
-                status,
-                "Face login successful!",
-                "success"
-            );
-
-
-            $("faceLoginUser").style.display =
-                "block";
-
-
-            const user =
-                result.user || {};
-
-
-            $("faceLoginUser").innerHTML = `
-
-                <strong>
-                    Welcome ${escapeHtml(
-                        user.name || "User"
-                    )}
-                </strong>
-
-                <br>
-
-                Email:
-                ${escapeHtml(
-                    user.email || "N/A"
-                )}
-
-                <br>
-
-                User ID:
-                ${escapeHtml(
-                    String(user.id || "N/A")
-                )}
-
-                ${
-                    result.similarity !== undefined
-                    ?
-                    `
-                    <br>
-                    Similarity:
-                    ${escapeHtml(
-                        String(result.similarity)
-                    )}
-                    `
-                    :
-                    ""
                 }
 
-            `;
+            } else {
+
+                errorMessage =
+                    JSON.stringify(
+                        data,
+                        null,
+                        2
+                    );
+            }
+
+        } catch {
+
+            try {
+
+                const text =
+                    await response.text();
+
+                if (text) {
+                    errorMessage = text;
+                }
+
+            } catch {
+                // Keep default message.
+            }
+        }
+
+        return errorMessage;
+    }
 
 
-            stopLoginCamera();
+    // ============================================================
+    // API REQUEST HELPER
+    // ============================================================
+
+    async function apiRequest(
+        url,
+        options = {}
+    ) {
+
+        debug(
+            `${options.method || "GET"} ${url}`
+        );
+
+        const response =
+            await fetch(url, options);
+
+        debug(
+            `Response: ${response.status}`
+        );
+
+        if (!response.ok) {
+
+            const errorMessage =
+                await getErrorMessage(response);
+
+            throw new Error(errorMessage);
+        }
+
+        return response;
+    }
 
 
-        } catch (error) {
+    // ============================================================
+    // TOKEN
+    // ============================================================
 
-            setStatus(
-                status,
-                `Face login failed: ${error.message}`,
-                "error"
+    function getAccessToken() {
+
+        return localStorage.getItem(
+            ACCESS_TOKEN_KEY
+        );
+    }
+
+
+    function saveAccessToken(token) {
+
+        localStorage.setItem(
+            ACCESS_TOKEN_KEY,
+            token
+        );
+    }
+
+
+    function clearAccessToken() {
+
+        localStorage.removeItem(
+            ACCESS_TOKEN_KEY
+        );
+    }
+
+
+    // ============================================================
+    // TABS
+    // ============================================================
+
+    document
+        .querySelectorAll(".tab-button")
+        .forEach(button => {
+
+            button.addEventListener(
+                "click",
+                () => {
+
+                    const sectionId =
+                        button.dataset.section;
+
+                    document
+                        .querySelectorAll(".tab-button")
+                        .forEach(btn => {
+
+                            btn.classList.remove(
+                                "active"
+                            );
+
+                        });
+
+                    document
+                        .querySelectorAll(".section")
+                        .forEach(section => {
+
+                            section.classList.remove(
+                                "active"
+                            );
+
+                        });
+
+                    button.classList.add(
+                        "active"
+                    );
+
+                    $(sectionId)
+                        .classList.add(
+                            "active"
+                        );
+
+                    if (
+                        sectionId !==
+                        "face-register-section"
+                    ) {
+
+                        stopFaceRegisterCamera();
+                    }
+
+                    if (
+                        sectionId !==
+                        "face-login-section"
+                    ) {
+
+                        stopFaceLoginCamera();
+                    }
+                }
+            );
+        });
+
+
+    // ============================================================
+    // REGISTER ACCOUNT
+    // ============================================================
+
+    $("register-form")
+        .addEventListener(
+            "submit",
+            async event => {
+
+                event.preventDefault();
+
+                hideStatus(
+                    "register-status"
+                );
+
+                const name =
+                    $("register-name")
+                    .value
+                    .trim();
+
+                const email =
+                    $("register-email")
+                    .value
+                    .trim();
+
+                const password =
+                    $("register-password")
+                    .value;
+
+                try {
+
+                    const response =
+                        await apiRequest(
+                            `${API_URL}/api/v1/auth/register`,
+                            {
+                                method: "POST",
+
+                                headers: {
+                                    "Content-Type":
+                                        "application/json"
+                                },
+
+                                body: JSON.stringify({
+                                    name,
+                                    email,
+                                    password
+                                })
+                            }
+                        );
+
+                    const data =
+                        await response.json();
+
+                    debug(
+                        "Registration response: " +
+                        JSON.stringify(data)
+                    );
+
+                    showStatus(
+                        "register-status",
+                        "Registration successful.",
+                        "success"
+                    );
+
+                } catch (error) {
+
+                    debug(
+                        "Registration failed: " +
+                        error.message
+                    );
+
+                    showStatus(
+                        "register-status",
+                        "Registration failed: " +
+                        error.message,
+                        "error"
+                    );
+                }
+            }
+        );
+
+
+    // ============================================================
+    // PASSWORD LOGIN
+    // ============================================================
+
+    $("login-form")
+        .addEventListener(
+            "submit",
+            async event => {
+
+                event.preventDefault();
+
+                hideStatus(
+                    "login-status"
+                );
+
+                const email =
+                    $("login-email")
+                    .value
+                    .trim();
+
+                const password =
+                    $("login-password")
+                    .value;
+
+                try {
+
+                    const response =
+                        await apiRequest(
+                            `${API_URL}/api/v1/auth/login`,
+                            {
+                                method: "POST",
+
+                                headers: {
+                                    "Content-Type":
+                                        "application/x-www-form-urlencoded"
+                                },
+
+                                body:
+                                    new URLSearchParams({
+                                        username: email,
+                                        password: password
+                                    })
+                            }
+                        );
+
+                    const data =
+                        await response.json();
+
+                    debug(
+                        "Password login response: " +
+                        JSON.stringify(data)
+                    );
+
+                    if (
+                        !data.access_token
+                    ) {
+
+                        throw new Error(
+                            "Backend did not return access_token."
+                        );
+                    }
+
+                    saveAccessToken(
+                        data.access_token
+                    );
+
+                    showStatus(
+                        "login-status",
+                        "Password login successful.",
+                        "success"
+                    );
+
+                } catch (error) {
+
+                    debug(
+                        "Password login failed: " +
+                        error.message
+                    );
+
+                    showStatus(
+                        "login-status",
+                        "Login failed: " +
+                        error.message,
+                        "error"
+                    );
+                }
+            }
+        );
+
+
+    // ============================================================
+    // CAMERA ACCESS
+    // ============================================================
+
+    async function startCamera(
+        videoElement
+    ) {
+
+        if (!navigator.mediaDevices ||
+            !navigator.mediaDevices.getUserMedia) {
+
+            throw new Error(
+                "Camera access is not supported by this browser."
+            );
+        }
+
+        return await navigator.mediaDevices.getUserMedia({
+            video: {
+                width: {
+                    ideal: 640
+                },
+
+                height: {
+                    ideal: 480
+                },
+
+                facingMode: "user"
+            },
+
+            audio: false
+        });
+    }
+
+
+    // ============================================================
+    // FACE REGISTER CAMERA
+    // ============================================================
+
+    $("start-face-register-camera")
+        .addEventListener(
+            "click",
+            async () => {
+
+                try {
+
+                    stopFaceRegisterCamera();
+
+                    faceRegisterStream =
+                        await startCamera(
+                            $("face-register-video")
+                        );
+
+                    $("face-register-video")
+                        .srcObject =
+                        faceRegisterStream;
+
+                    $("capture-face-register")
+                        .disabled = false;
+
+                    $("stop-face-register-camera")
+                        .disabled = false;
+
+                    showStatus(
+                        "face-register-status",
+                        "Camera started. Position your face clearly and click Capture & Register Face.",
+                        "info"
+                    );
+
+                } catch (error) {
+
+                    showStatus(
+                        "face-register-status",
+                        "Could not start camera: " +
+                        error.message,
+                        "error"
+                    );
+
+                    debug(
+                        "Face register camera error: " +
+                        error.message
+                    );
+                }
+            }
+        );
+
+
+    // ============================================================
+    // STOP FACE REGISTER CAMERA
+    // ============================================================
+
+    $("stop-face-register-camera")
+        .addEventListener(
+            "click",
+            stopFaceRegisterCamera
+        );
+
+
+    function stopFaceRegisterCamera() {
+
+        if (faceRegisterStream) {
+
+            faceRegisterStream
+                .getTracks()
+                .forEach(track => {
+                    track.stop();
+                });
+
+            faceRegisterStream = null;
+        }
+
+        const video =
+            $("face-register-video");
+
+        if (video) {
+            video.srcObject = null;
+        }
+
+        $("capture-face-register")
+            .disabled = true;
+
+        $("stop-face-register-camera")
+            .disabled = true;
+    }
+
+
+    // ============================================================
+    // CAPTURE IMAGE FROM VIDEO
+    // ============================================================
+
+    function captureVideoFrame(
+        video,
+        canvas
+    ) {
+
+        if (
+            !video.videoWidth ||
+            !video.videoHeight
+        ) {
+
+            throw new Error(
+                "Camera frame is not ready yet."
+            );
+        }
+
+        canvas.width =
+            video.videoWidth;
+
+        canvas.height =
+            video.videoHeight;
+
+        const context =
+            canvas.getContext("2d");
+
+        context.drawImage(
+            video,
+            0,
+            0,
+            canvas.width,
+            canvas.height
+        );
+
+        return canvas.toDataURL(
+            "image/jpeg",
+            0.90
+        );
+    }
+
+
+    // ============================================================
+    // DATA URL -> BLOB
+    // ============================================================
+
+    async function dataURLToBlob(
+        dataURL
+    ) {
+
+        const response =
+            await fetch(dataURL);
+
+        return await response.blob();
+    }
+
+
+    // ============================================================
+    // FACE ENROLLMENT
+    // ============================================================
+
+    $("capture-face-register")
+        .addEventListener(
+            "click",
+            async () => {
+
+                const token =
+                    getAccessToken();
+
+                if (!token) {
+
+                    showStatus(
+                        "face-register-status",
+                        "Please login with your password first.",
+                        "error"
+                    );
+
+                    return;
+                }
+
+                if (!faceRegisterStream) {
+
+                    showStatus(
+                        "face-register-status",
+                        "Please start the camera first.",
+                        "error"
+                    );
+
+                    return;
+                }
+
+                try {
+
+                    $("capture-face-register")
+                        .disabled = true;
+
+                    showStatus(
+                        "face-register-status",
+                        "Capturing face...",
+                        "info"
+                    );
+
+                    const dataURL =
+                        captureVideoFrame(
+                            $("face-register-video"),
+                            $("face-register-canvas")
+                        );
+
+                    const blob =
+                        await dataURLToBlob(
+                            dataURL
+                        );
+
+                    const formData =
+                        new FormData();
+
+                    formData.append(
+                        "image",
+                        blob,
+                        "face.jpg"
+                    );
+
+                    const response =
+                        await apiRequest(
+                            `${API_URL}/api/v1/face/enroll`,
+                            {
+                                method: "POST",
+
+                                headers: {
+                                    Authorization:
+                                        `Bearer ${token}`
+                                },
+
+                                body: formData
+                            }
+                        );
+
+                    const data =
+                        await response.json();
+
+                    debug(
+                        "Face enrollment response: " +
+                        JSON.stringify(data)
+                    );
+
+                    showStatus(
+                        "face-register-status",
+                        "Face registered successfully.",
+                        "success"
+                    );
+
+                } catch (error) {
+
+                    debug(
+                        "Face enrollment failed: " +
+                        error.message
+                    );
+
+                    showStatus(
+                        "face-register-status",
+                        "Face registration failed: " +
+                        error.message,
+                        "error"
+                    );
+
+                } finally {
+
+                    $("capture-face-register")
+                        .disabled = false;
+                }
+            }
+        );
+
+
+    // ============================================================
+    // FACE LOGIN CAMERA
+    // ============================================================
+
+    $("start-face-login-camera")
+        .addEventListener(
+            "click",
+            async () => {
+
+                try {
+
+                    stopFaceLoginCamera();
+
+                    livenessSessionId = null;
+
+                    faceLoginStream =
+                        await startCamera(
+                            $("face-login-video")
+                        );
+
+                    $("face-login-video")
+                        .srcObject =
+                        faceLoginStream;
+
+                    $("face-login-button")
+                        .disabled = false;
+
+                    $("stop-face-login-camera")
+                        .disabled = false;
+
+                    $("face-login-user")
+                        .classList.add(
+                            "hidden"
+                        );
+
+                    showStatus(
+                        "face-login-status",
+                        "Camera started. Click Capture & Login.",
+                        "info"
+                    );
+
+                    debug(
+                        "Face login camera started."
+                    );
+
+                } catch (error) {
+
+                    debug(
+                        "Face login camera error: " +
+                        error.message
+                    );
+
+                    showStatus(
+                        "face-login-status",
+                        "Could not start camera: " +
+                        error.message,
+                        "error"
+                    );
+                }
+            }
+        );
+
+
+    // ============================================================
+    // STOP FACE LOGIN CAMERA
+    // ============================================================
+
+    $("stop-face-login-camera")
+        .addEventListener(
+            "click",
+            stopFaceLoginCamera
+        );
+
+
+    function stopFaceLoginCamera() {
+
+        livenessRunning = false;
+
+        livenessSessionId = null;
+
+        if (faceLoginStream) {
+
+            faceLoginStream
+                .getTracks()
+                .forEach(track => {
+                    track.stop();
+                });
+
+            faceLoginStream = null;
+        }
+
+        const video =
+            $("face-login-video");
+
+        if (video) {
+            video.srcObject = null;
+        }
+
+        $("face-login-button")
+            .disabled = true;
+
+        $("stop-face-login-camera")
+            .disabled = true;
+    }
+
+
+    // ============================================================
+// START LIVENESS SESSION
+// ============================================================
+
+async function startLivenessSession() {
+
+    debug(
+        "Starting liveness session..."
+    );
+
+    const response =
+        await apiRequest(
+            `${API_URL}/api/v1/face/liveness/start`,
+            {
+                method: "POST"
+            }
+        );
+
+    const data =
+        await response.json();
+
+    debug(
+        "Liveness start response: " +
+        JSON.stringify(data)
+    );
+
+    if (!response.ok) {
+
+        throw new Error(
+            data.detail ||
+            data.message ||
+            "Could not start liveness session."
+        );
+    }
+
+    if (!data.session_id) {
+
+        throw new Error(
+            "Backend did not return a liveness session_id."
+        );
+    }
+
+    // ------------------------------------------------------------
+    // Store liveness session ID
+    // ------------------------------------------------------------
+
+    livenessSessionId =
+        data.session_id;
+
+    debug(
+        "Liveness session ID created: " +
+        livenessSessionId
+    );
+
+    // ------------------------------------------------------------
+    // Store challenge information
+    // ------------------------------------------------------------
+
+    if (data.challenge) {
+
+        debug(
+            "Liveness challenge: " +
+            data.challenge
+        );
+    }
+
+    if (data.challenge_message) {
+
+        debug(
+            "Liveness instruction: " +
+            data.challenge_message
+        );
+
+        // Display challenge to the user if the element exists
+        const livenessMessage =
+            document.getElementById(
+                "livenessMessage"
             );
 
-        } finally {
+        if (livenessMessage) {
 
-            button.disabled =
-                false;
-
+            livenessMessage.textContent =
+                data.challenge_message;
         }
-
     }
-);
 
-
-/* ================================================================
-   STOP LOGIN CAMERA
-================================================================ */
-
-function stopLoginCamera() {
-
-    loginStream =
-        stopStream(loginStream);
-
-
-    $("loginVideo").srcObject =
-        null;
-
-
-    $("faceLoginButton").disabled =
-        true;
-
-
-    $("loginPlaceholder")
-        .classList
-        .remove("hidden");
-
+    return data;
 }
 
 
-/* ================================================================
-   HTML ESCAPING
-================================================================ */
+    // ============================================================
+    // SEND ONE LIVENESS FRAME
+    // ============================================================
 
-function escapeHtml(value) {
+    async function sendLivenessFrame() {
 
-    return String(value)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
+        if (!livenessSessionId) {
 
-}
-
-
-/* ================================================================
-   LOGOUT
-================================================================ */
-
-$("logoutButton").addEventListener(
-    "click",
-    () => {
-
-        clearToken();
-
-
-        stopRegisterCamera();
-
-        stopLoginCamera();
-
-
-        $("loginUser").style.display =
-            "none";
-
-        $("faceLoginUser").style.display =
-            "none";
-
-
-        $("loginForm").reset();
-
-
-        clearStatus(
-            $("loginStatus")
-        );
-
-        clearStatus(
-            $("faceRegisterStatus")
-        );
-
-        clearStatus(
-            $("faceLoginStatus")
-        );
-
-
-        setStatus(
-            $("loginStatus"),
-            "You have been logged out.",
-            "success"
-        );
-
-
-        openSection(
-            "loginSection"
-        );
-
-    }
-);
-
-
-/* ================================================================
-   PAGE VISIBILITY
-   Stop camera when browser tab is hidden.
-================================================================ */
-
-document.addEventListener(
-    "visibilitychange",
-    () => {
-
-        if (document.hidden) {
-
-            stopRegisterCamera();
-
-            stopLoginCamera();
-
+            throw new Error(
+                "Liveness session ID is missing."
+            );
         }
 
+        const dataURL =
+            captureVideoFrame(
+                $("face-login-video"),
+                $("face-login-canvas")
+            );
+
+        const blob =
+            await dataURLToBlob(
+                dataURL
+            );
+
+        const formData =
+            new FormData();
+
+        formData.append(
+            "image",
+            blob,
+            "liveness.jpg"
+        );
+
+
+        // IMPORTANT:
+        // session_id MUST be a QUERY PARAMETER.
+        const url =
+            `${API_URL}/api/v1/face/liveness/frame` +
+            `?session_id=${encodeURIComponent(
+                livenessSessionId
+            )}`;
+
+
+        debug(
+            "Sending liveness frame: " +
+            url
+        );
+
+
+        const response =
+            await apiRequest(
+                url,
+                {
+                    method: "POST",
+                    body: formData
+                }
+            );
+
+
+        const data =
+            await response.json();
+
+
+        debug(
+            "Liveness response: " +
+            JSON.stringify(data)
+        );
+
+
+        return data;
     }
-);
 
 
-/* ================================================================
-   BEFORE PAGE CLOSE
-================================================================ */
+    // ============================================================
+    // RUN LIVENESS
+    // ============================================================
 
-window.addEventListener(
-    "beforeunload",
-    () => {
+    async function runLivenessCheck() {
 
-        stopRegisterCamera();
+        livenessRunning = true;
 
-        stopLoginCamera();
+        const startTime =
+            Date.now();
 
+        const maxDuration =
+            30000;
+
+
+        showStatus(
+            "face-login-status",
+            "Liveness check started.\nSlowly move your head slightly left and right.",
+            "info"
+        );
+
+
+        while (
+            livenessRunning &&
+            Date.now() - startTime < maxDuration
+        ) {
+
+            try {
+
+                const result =
+                    await sendLivenessFrame();
+
+
+                if (result.liveness === true) {
+
+                    debug(
+                        "Liveness PASSED."
+                    );
+
+                    livenessRunning = false;
+
+                    showStatus(
+                        "face-login-status",
+                        "Liveness passed. Recognizing face...",
+                        "success"
+                    );
+
+                    return true;
+                }
+
+
+                if (
+                    result.status ===
+                    "no_face"
+                ) {
+
+                    showStatus(
+                        "face-login-status",
+                        "No face detected. Keep your face inside the camera.",
+                        "warning"
+                    );
+
+                } else if (
+                    result.status ===
+                    "multiple_faces"
+                ) {
+
+                    showStatus(
+                        "face-login-status",
+                        "Multiple faces detected. Only one person should be visible.",
+                        "warning"
+                    );
+
+                } else {
+
+                    showStatus(
+                        "face-login-status",
+                        "Checking liveness...\nMove your head slightly left and right.",
+                        "info"
+                    );
+                }
+
+
+                await new Promise(
+                    resolve =>
+                        setTimeout(
+                            resolve,
+                            300
+                        )
+                );
+
+            } catch (error) {
+
+                livenessRunning = false;
+
+                debug(
+                    "Liveness error: " +
+                    error.message
+                );
+
+                throw error;
+            }
+        }
+
+
+        livenessRunning = false;
+
+        throw new Error(
+            "Liveness check timed out. Please try again and move your head slightly left and right."
+        );
     }
-);
 
 
-/* ================================================================
-   INITIALIZATION
-================================================================ */
+    // ============================================================
+    // FINAL FACE LOGIN
+    // ============================================================
 
-updateAuthState();
+    async function performFaceLogin() {
+
+        if (!livenessSessionId) {
+
+            throw new Error(
+                "Liveness session ID is missing."
+            );
+        }
+
+
+        const dataURL =
+            captureVideoFrame(
+                $("face-login-video"),
+                $("face-login-canvas")
+            );
+
+
+        const blob =
+            await dataURLToBlob(
+                dataURL
+            );
+
+
+        const formData =
+            new FormData();
+
+
+        formData.append(
+            "image",
+            blob,
+            "face-login.jpg"
+        );
+
+
+        // ========================================================
+        // THIS IS THE IMPORTANT FIX
+        //
+        // session_id MUST be included in the URL.
+        // ========================================================
+
+        const loginURL =
+            `${API_URL}/api/v1/face/login` +
+            `?session_id=${encodeURIComponent(
+                livenessSessionId
+            )}`;
+
+
+        debug(
+            "FINAL FACE LOGIN URL: " +
+            loginURL
+        );
+
+
+        const response =
+            await apiRequest(
+                loginURL,
+                {
+                    method: "POST",
+                    body: formData
+                }
+            );
+
+
+        const data =
+            await response.json();
+
+
+        debug(
+            "Face login response: " +
+            JSON.stringify(data)
+        );
+
+
+        return data;
+    }
+
+
+    // ============================================================
+    // FACE LOGIN BUTTON
+    // ============================================================
+
+    $("face-login-button")
+        .addEventListener(
+            "click",
+            async () => {
+
+                if (!faceLoginStream) {
+
+                    showStatus(
+                        "face-login-status",
+                        "Please start the camera first.",
+                        "error"
+                    );
+
+                    return;
+                }
+
+
+                try {
+
+                    $("face-login-button")
+                        .disabled = true;
+
+
+                    $("face-login-user")
+                        .classList.add(
+                            "hidden"
+                        );
+
+
+                    // ------------------------------------------------
+                    // STEP 1
+                    // Start liveness session
+                    // ------------------------------------------------
+
+                    await startLivenessSession();
+
+
+                    // ------------------------------------------------
+                    // STEP 2
+                    // Perform multiple liveness frames
+                    // ------------------------------------------------
+
+                    const live =
+                        await runLivenessCheck();
+
+
+                    if (!live) {
+
+                        throw new Error(
+                            "Liveness verification failed."
+                        );
+                    }
+
+
+                    // ------------------------------------------------
+                    // STEP 3
+                    // Final face authentication
+                    // ------------------------------------------------
+
+                    const result =
+                        await performFaceLogin();
+
+
+                    // ------------------------------------------------
+                    // STEP 4
+                    // Save JWT
+                    // ------------------------------------------------
+
+                    if (
+                        result.access_token
+                    ) {
+
+                        saveAccessToken(
+                            result.access_token
+                        );
+                    }
+
+
+                    // ------------------------------------------------
+                    // STEP 5
+                    // Display result
+                    // ------------------------------------------------
+
+                    let message =
+                        "Face login successful.";
+
+
+                    if (
+                        result.door ===
+                        "unlocked"
+                    ) {
+
+                        message +=
+                            "\nDoor unlocked successfully.";
+
+                    } else if (
+                        result.door ===
+                        "unlock_failed"
+                    ) {
+
+                        message +=
+                            "\nFace authentication succeeded, but the door could not be unlocked.";
+                    }
+
+
+                    if (
+                        result.similarity !==
+                        undefined
+                    ) {
+
+                        message +=
+                            `\nSimilarity: ${result.similarity}`;
+                    }
+
+
+                    showStatus(
+                        "face-login-status",
+                        message,
+                        result.door ===
+                            "unlocked"
+                            ? "success"
+                            : "warning"
+                    );
+
+
+                    // ------------------------------------------------
+                    // USER INFORMATION
+                    // ------------------------------------------------
+
+                    if (result.user) {
+
+                        const user =
+                            result.user;
+
+                        const userBox =
+                            $("face-login-user");
+
+                        userBox.innerHTML = `
+                            <strong>Authenticated User</strong><br><br>
+                            ID: ${escapeHtml(String(user.id ?? ""))}<br>
+                            Name: ${escapeHtml(String(user.name ?? ""))}<br>
+                            Email: ${escapeHtml(String(user.email ?? ""))}<br>
+                            Door: ${escapeHtml(String(result.door ?? ""))}
+                        `;
+
+                        userBox.classList.remove(
+                            "hidden"
+                        );
+                    }
+
+
+                    debug(
+                        "Face authentication completed successfully."
+                    );
+
+
+                    // Session has already been consumed
+                    // by backend after successful login.
+                    livenessSessionId = null;
+
+
+                } catch (error) {
+
+                    debug(
+                        "Face login failed: " +
+                        error.message
+                    );
+
+
+                    showStatus(
+                        "face-login-status",
+                        "Face login failed: " +
+                        error.message,
+                        "error"
+                    );
+
+
+                    // Clear session so next attempt
+                    // starts a completely new liveness flow.
+                    livenessSessionId = null;
+
+                } finally {
+
+                    $("face-login-button")
+                        .disabled = false;
+                }
+            }
+        );
+
+
+    // ============================================================
+    // HTML ESCAPING
+    // ============================================================
+
+    function escapeHtml(value) {
+
+        return value
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#039;");
+    }
+
+
+    // ============================================================
+    // PAGE CLEANUP
+    // ============================================================
+
+    document.addEventListener(
+        "visibilitychange",
+        () => {
+
+            if (
+                document.hidden
+            ) {
+
+                stopFaceRegisterCamera();
+                stopFaceLoginCamera();
+            }
+        }
+    );
+
+
+    window.addEventListener(
+        "beforeunload",
+        () => {
+
+            stopFaceRegisterCamera();
+            stopFaceLoginCamera();
+        }
+    );
+
+
+    // ============================================================
+    // INITIALIZATION
+    // ============================================================
+
+    debug(
+        "Face Authentication frontend initialized."
+    );
+
+    debug(
+        "API URL: " +
+        API_URL
+    );
+
+    debug(
+        "Access token present: " +
+        Boolean(getAccessToken())
+    );
 
 </script>
 

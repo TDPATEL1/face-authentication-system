@@ -20,9 +20,12 @@ from app.core.database import get_db
 from app.core.security import create_access_token
 from app.models.face_template import FaceTemplate
 from app.models.user import User
+from app.services.audit_service import AuditService
+from app.services.anti_spoofing import anti_spoofing_service
 from app.services.face_enrollment import FaceEnrollmentService
 from app.services.face_login import FaceLoginService
 from app.services.face_matching import FaceMatchingService
+from app.services.liveness_session import liveness_session_manager
 
 
 logger = logging.getLogger(__name__)
@@ -39,7 +42,8 @@ router = APIRouter(
 # ==================================================
 
 # Models are loaded once when the application starts.
-# This avoids reloading YuNet/SFace for every request.
+# This avoids reloading YuNet/SFace/anti-spoofing
+# models for every request.
 
 face_matcher = FaceMatchingService()
 
@@ -50,6 +54,63 @@ face_enrollment_service = FaceEnrollmentService(
 face_login_service = FaceLoginService(
     matcher=face_matcher
 )
+
+
+# ==================================================
+# Anti-Spoofing Configuration
+# ==================================================
+
+# MiniFASNetV2 verified REAL class.
+#
+# Class 2 was observed for a real live face during
+# the standalone anti-spoofing test.
+
+ANTI_SPOOF_REAL_CLASS_ID = 2
+
+# Minimum confidence required for a REAL prediction.
+#
+# We start conservatively. This value can be tuned
+# after real-face and spoof testing.
+
+ANTI_SPOOF_MIN_CONFIDENCE = 0.80
+
+
+# ==================================================
+# Helper: Safe Audit Logging
+# ==================================================
+
+def safe_audit_log(
+    db: Session,
+    event_type: str,
+    success: bool,
+    user_id: int | None = None,
+    similarity: float | None = None,
+    details: str | None = None,
+) -> None:
+    """
+    Write an audit event without allowing an audit failure
+    to break the main authentication operation.
+    """
+
+    try:
+        AuditService.log(
+            db=db,
+            event_type=event_type,
+            success=success,
+            user_id=user_id,
+            similarity=similarity,
+            details=details,
+        )
+
+    except Exception:
+        logger.error(
+            "Failed to write audit log. event=%s user_id=%s",
+            event_type,
+            user_id,
+            exc_info=True,
+        )
+
+        db.rollback()
 
 
 # ==================================================
@@ -66,7 +127,6 @@ async def decode_upload_image(
         BGR NumPy image.
     """
 
-    # Check MIME type
     if (
         not upload.content_type
         or not upload.content_type.startswith("image/")
@@ -76,7 +136,6 @@ async def decode_upload_image(
             detail="Uploaded file must be an image (JPEG/PNG)",
         )
 
-    # Read uploaded bytes
     image_bytes = await upload.read()
 
     if not image_bytes:
@@ -85,13 +144,11 @@ async def decode_upload_image(
             detail="Uploaded image file is empty",
         )
 
-    # Convert bytes to NumPy array
     image_array = np.frombuffer(
         image_bytes,
         dtype=np.uint8,
     )
 
-    # Decode image using OpenCV
     frame = cv2.imdecode(
         image_array,
         cv2.IMREAD_COLOR,
@@ -126,32 +183,36 @@ async def enroll_face(
     The endpoint accepts either:
         image
         file
-
-    This keeps compatibility with different frontend
-    form-data field names.
     """
-
-    # ----------------------------------------------
-    # Select uploaded image
-    # ----------------------------------------------
 
     upload = image or file
 
     if upload is None:
+        safe_audit_log(
+            db=db,
+            event_type="FACE_ENROLLMENT_FAILED",
+            success=False,
+            user_id=current_user.id,
+            details="No image file provided",
+        )
+
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No image file provided in form data",
         )
 
-    # ----------------------------------------------
-    # Decode image
-    # ----------------------------------------------
+    try:
+        frame = await decode_upload_image(upload)
 
-    frame = await decode_upload_image(upload)
-
-    # ----------------------------------------------
-    # Generate encrypted face embedding
-    # ----------------------------------------------
+    except HTTPException as exc:
+        safe_audit_log(
+            db=db,
+            event_type="FACE_ENROLLMENT_FAILED",
+            success=False,
+            user_id=current_user.id,
+            details=f"Image validation failed: {exc.detail}",
+        )
+        raise
 
     try:
         encrypted_embedding = await run_in_threadpool(
@@ -160,6 +221,14 @@ async def enroll_face(
         )
 
     except ValueError as exc:
+        safe_audit_log(
+            db=db,
+            event_type="FACE_ENROLLMENT_FAILED",
+            success=False,
+            user_id=current_user.id,
+            details=str(exc),
+        )
+
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
@@ -171,14 +240,18 @@ async def enroll_face(
             exc_info=True,
         )
 
+        safe_audit_log(
+            db=db,
+            event_type="FACE_ENROLLMENT_FAILED",
+            success=False,
+            user_id=current_user.id,
+            details="Face embedding generation failed",
+        )
+
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Face enrollment failed",
         )
-
-    # ----------------------------------------------
-    # Save face template
-    # ----------------------------------------------
 
     try:
         existing_template = (
@@ -189,11 +262,9 @@ async def enroll_face(
             .first()
         )
 
-        # Update existing template
         if existing_template:
             existing_template.embedding = encrypted_embedding
 
-        # Create new template
         else:
             new_template = FaceTemplate(
                 user_id=current_user.id,
@@ -212,18 +283,232 @@ async def enroll_face(
             exc_info=True,
         )
 
+        safe_audit_log(
+            db=db,
+            event_type="FACE_ENROLLMENT_FAILED",
+            success=False,
+            user_id=current_user.id,
+            details="Could not save face template to database",
+        )
+
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Could not save face template to database",
         )
 
-    # ----------------------------------------------
-    # Successful enrollment response
-    # ----------------------------------------------
+    safe_audit_log(
+        db=db,
+        event_type="FACE_ENROLLMENT_SUCCESS",
+        success=True,
+        user_id=current_user.id,
+        details="Face template enrolled successfully",
+    )
 
     return {
         "message": "Face enrolled successfully",
         "user_id": current_user.id,
+    }
+
+
+# ==================================================
+# LIVENESS SESSION START
+# ==================================================
+
+@router.post(
+    "/liveness/start",
+    status_code=status.HTTP_200_OK,
+)
+async def start_liveness():
+    """
+    Start a new short-lived liveness verification session.
+
+    A random directional challenge is generated for
+    this session.
+    """
+
+    session_id = (
+        liveness_session_manager.create_session()
+    )
+
+    session = (
+        liveness_session_manager.get_session(
+            session_id
+        )
+    )
+
+    if session is None:
+        logger.error(
+            "Could not retrieve newly created "
+            "liveness session"
+        )
+
+        raise HTTPException(
+            status_code=500,
+            detail="Could not create liveness session",
+        )
+
+    challenge = session.detector.challenge
+
+    challenge_message = (
+        session.detector.challenge_message()
+    )
+
+    logger.info(
+        "Liveness session created. "
+        "session_id=%s challenge=%s",
+        session_id,
+        challenge,
+    )
+
+    return {
+        "message": "Liveness session started",
+        "session_id": session_id,
+        "expires_in":
+            liveness_session_manager
+            .SESSION_TIMEOUT_SECONDS,
+        "challenge": challenge,
+        "challenge_message":
+            challenge_message,
+    }
+
+
+# ==================================================
+# LIVENESS FRAME
+# ==================================================
+
+@router.post(
+    "/liveness/frame",
+    status_code=status.HTTP_200_OK,
+)
+async def process_liveness_frame(
+    session_id: str,
+    image: UploadFile | None = File(None),
+    file: UploadFile | None = File(None),
+):
+    """
+    Process one camera frame for challenge-based
+    liveness detection.
+
+    The frontend sends multiple frames using the
+    same session_id.
+    """
+
+    session = (
+        liveness_session_manager.get_session(
+            session_id
+        )
+    )
+
+    if session is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Liveness session is invalid or expired"
+            ),
+        )
+
+    upload = image or file
+
+    if upload is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "No image file provided in form data"
+            ),
+        )
+
+    frame = await decode_upload_image(upload)
+
+    try:
+        faces = await run_in_threadpool(
+            face_matcher.detector.detect,
+            frame,
+        )
+
+    except Exception:
+        logger.error(
+            "Liveness face detection error",
+            exc_info=True,
+        )
+
+        raise HTTPException(
+            status_code=(
+                status.HTTP_500_INTERNAL_SERVER_ERROR
+            ),
+            detail=(
+                "Could not process liveness frame"
+            ),
+        )
+
+    if len(faces) == 0:
+        return {
+            "liveness": False,
+            "status": "no_face",
+            "challenge":
+                session.detector.challenge,
+            "challenge_message":
+                session.detector.challenge_message(),
+            "message": (
+                "No face detected. "
+                "Please look at the camera."
+            ),
+        }
+
+    if len(faces) > 1:
+        return {
+            "liveness": False,
+            "status": "multiple_faces",
+            "challenge":
+                session.detector.challenge,
+            "challenge_message":
+                session.detector.challenge_message(),
+            "message": (
+                "Multiple faces detected. "
+                "Only one person should be visible."
+            ),
+        }
+
+    face = faces[0]
+
+    liveness_passed = (
+        await run_in_threadpool(
+            session.detector.check,
+            face,
+        )
+    )
+
+    if liveness_passed:
+
+        logger.info(
+            "Liveness verification successful. "
+            "session_id=%s challenge=%s",
+            session_id,
+            session.detector.challenge,
+        )
+
+        return {
+            "liveness": True,
+            "status": "passed",
+            "challenge":
+                session.detector.challenge,
+            "challenge_message":
+                session.detector.challenge_message(),
+            "message": (
+                "Liveness verification successful"
+            ),
+        }
+
+    return {
+        "liveness": False,
+        "status": "checking",
+        "challenge":
+            session.detector.challenge,
+        "challenge_message":
+            session.detector.challenge_message(),
+        "movement_count":
+            session.detector.movement_count,
+        "message":
+            session.detector.challenge_message(),
     }
 
 
@@ -236,6 +521,7 @@ async def enroll_face(
     status_code=status.HTTP_200_OK,
 )
 async def face_login(
+    session_id: str,
     image: UploadFile | None = File(None),
     file: UploadFile | None = File(None),
     db: Session = Depends(get_db),
@@ -243,65 +529,382 @@ async def face_login(
     """
     Authenticate a user using face recognition.
 
-    Successful authentication automatically unlocks
-    the simulated door for the configured duration
-    (currently 5 seconds).
+    Required security pipeline:
+
+        1. Valid liveness session
+        2. Completed liveness challenge
+        3. Anti-spoofing verification
+        4. SFace face recognition
+        5. User lookup
+        6. Liveness session consumption
+        7. Door unlock
+        8. JWT creation
     """
 
-    # ----------------------------------------------
-    # Select uploaded image
-    # ----------------------------------------------
+    # ==================================================
+    # STEP 1: VERIFY LIVENESS SESSION
+    # ==================================================
+
+    session = liveness_session_manager.get_session(
+        session_id
+    )
+
+    if session is None:
+
+        safe_audit_log(
+            db=db,
+            event_type="LIVENESS_FAILED",
+            success=False,
+            details=(
+                "Liveness session is invalid "
+                "or expired"
+            ),
+        )
+
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=(
+                "Liveness session is invalid "
+                "or expired"
+            ),
+        )
+
+    if not session.detector.is_live():
+
+        safe_audit_log(
+            db=db,
+            event_type="LIVENESS_FAILED",
+            success=False,
+            details=(
+                "Liveness verification "
+                "was not completed"
+            ),
+        )
+
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Liveness verification required",
+        )
+
+    # ==================================================
+    # STEP 2: SELECT UPLOADED IMAGE
+    # ==================================================
 
     upload = image or file
 
     if upload is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No image file provided in form data",
+
+        safe_audit_log(
+            db=db,
+            event_type="FACE_LOGIN_FAILED",
+            success=False,
+            details="No image file provided",
         )
 
-    # ----------------------------------------------
-    # Decode uploaded image
-    # ----------------------------------------------
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "No image file provided "
+                "in form data"
+            ),
+        )
 
-    frame = await decode_upload_image(upload)
-
-    # ----------------------------------------------
-    # Authenticate face
-    # ----------------------------------------------
+    # ==================================================
+    # STEP 3: DECODE IMAGE
+    # ==================================================
 
     try:
-        user_id, similarity = await run_in_threadpool(
-            face_login_service.authenticate,
+
+        frame = await decode_upload_image(
+            upload
+        )
+
+    except HTTPException as exc:
+
+        safe_audit_log(
+            db=db,
+            event_type="FACE_LOGIN_FAILED",
+            success=False,
+            details=(
+                f"Image validation failed: "
+                f"{exc.detail}"
+            ),
+        )
+
+        raise
+
+    # ==================================================
+    # STEP 4: DETECT FACE FOR ANTI-SPOOFING
+    # ==================================================
+
+    try:
+
+        faces = await run_in_threadpool(
+            face_matcher.detector.detect,
             frame,
-            db,
+        )
+
+    except Exception:
+
+        logger.error(
+            "Anti-spoofing face detection error",
+            exc_info=True,
+        )
+
+        safe_audit_log(
+            db=db,
+            event_type="ANTI_SPOOF_FAILED",
+            success=False,
+            details=(
+                "Could not detect face "
+                "for anti-spoofing"
+            ),
+        )
+
+        raise HTTPException(
+            status_code=(
+                status.HTTP_500_INTERNAL_SERVER_ERROR
+            ),
+            detail=(
+                "Could not process "
+                "anti-spoofing verification"
+            ),
+        )
+
+    # ==================================================
+    # STEP 5: REQUIRE EXACTLY ONE FACE
+    # ==================================================
+
+    if len(faces) == 0:
+
+        safe_audit_log(
+            db=db,
+            event_type="ANTI_SPOOF_FAILED",
+            success=False,
+            details="No face detected",
+        )
+
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="No face detected",
+        )
+
+    if len(faces) > 1:
+
+        safe_audit_log(
+            db=db,
+            event_type="ANTI_SPOOF_FAILED",
+            success=False,
+            details="Multiple faces detected",
+        )
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Multiple faces detected. "
+                "Only one person should be visible."
+            ),
+        )
+
+    face = faces[0]
+
+    # ==================================================
+    # STEP 6: MINI FASNET V2 ANTI-SPOOFING
+    # ==================================================
+
+    try:
+
+        anti_spoof_result = (
+            await run_in_threadpool(
+                anti_spoofing_service.predict,
+                frame,
+                face,
+            )
         )
 
     except ValueError as exc:
+
+        logger.error(
+            "Anti-spoofing validation error: %s",
+            exc,
+        )
+
+        safe_audit_log(
+            db=db,
+            event_type="ANTI_SPOOF_FAILED",
+            success=False,
+            details=str(exc),
+        )
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Anti-spoofing verification "
+                "could not process the face"
+            ),
+        )
+
+    except Exception:
+
+        logger.error(
+            "Anti-spoofing inference error",
+            exc_info=True,
+        )
+
+        safe_audit_log(
+            db=db,
+            event_type="ANTI_SPOOF_FAILED",
+            success=False,
+            details=(
+                "Anti-spoofing model "
+                "inference failed"
+            ),
+        )
+
+        raise HTTPException(
+            status_code=(
+                status.HTTP_500_INTERNAL_SERVER_ERROR
+            ),
+            detail=(
+                "Anti-spoofing verification failed"
+            ),
+        )
+
+    # --------------------------------------------------
+    # Read anti-spoofing result
+    # --------------------------------------------------
+
+    spoof_class_id = (
+        anti_spoof_result["class_id"]
+    )
+
+    spoof_confidence = (
+        anti_spoof_result["confidence"]
+    )
+
+    is_real = (
+        spoof_class_id
+        == ANTI_SPOOF_REAL_CLASS_ID
+        and spoof_confidence
+        >= ANTI_SPOOF_MIN_CONFIDENCE
+    )
+
+    logger.info(
+        "Anti-spoofing result: "
+        "class_id=%s confidence=%.4f "
+        "is_real=%s probabilities=%s",
+        spoof_class_id,
+        spoof_confidence,
+        is_real,
+        anti_spoof_result["probabilities"],
+    )
+
+    # ==================================================
+    # STEP 7: REJECT SPOOF
+    # ==================================================
+
+    if not is_real:
+
+        safe_audit_log(
+            db=db,
+            event_type="ANTI_SPOOF_FAILED",
+            success=False,
+            details=(
+                "Potential spoof detected. "
+                f"class_id={spoof_class_id}, "
+                f"confidence={spoof_confidence:.4f}, "
+                f"probabilities="
+                f"{anti_spoof_result['probabilities']}"
+            ),
+        )
+
+        logger.warning(
+            "Potential spoof detected. "
+            "class_id=%s confidence=%.4f",
+            spoof_class_id,
+            spoof_confidence,
+        )
+
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=(
+                "Anti-spoofing verification failed"
+            ),
+        )
+
+    # ==================================================
+    # STEP 8: SFACE FACE AUTHENTICATION
+    # ==================================================
+
+    try:
+
+        user_id, similarity = (
+            await run_in_threadpool(
+                face_login_service.authenticate,
+                frame,
+                db,
+            )
+        )
+
+    except ValueError as exc:
+
+        safe_audit_log(
+            db=db,
+            event_type="FACE_LOGIN_FAILED",
+            success=False,
+            details=str(exc),
+        )
+
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         )
 
     except Exception:
+
         logger.error(
             "Face login error",
             exc_info=True,
         )
 
+        safe_audit_log(
+            db=db,
+            event_type="FACE_LOGIN_FAILED",
+            success=False,
+            details=(
+                "Face authentication "
+                "processing failed"
+            ),
+        )
+
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=(
+                status.HTTP_500_INTERNAL_SERVER_ERROR
+            ),
             detail="Face authentication failed",
         )
 
-    # ----------------------------------------------
-    # Face was not recognized
-    # ----------------------------------------------
+    # ==================================================
+    # STEP 9: FACE NOT RECOGNIZED
+    # ==================================================
 
     if user_id is None:
+
         logger.warning(
-            "Face authentication failed. Similarity=%.4f",
+            "Face authentication failed. "
+            "Similarity=%.4f",
             similarity,
+        )
+
+        safe_audit_log(
+            db=db,
+            event_type="FACE_LOGIN_FAILED",
+            success=False,
+            similarity=similarity,
+            details=(
+                "Face was not recognized "
+                "after anti-spoofing passed"
+            ),
         )
 
         raise HTTPException(
@@ -309,9 +912,9 @@ async def face_login(
             detail="Face not recognized",
         )
 
-    # ----------------------------------------------
-    # Find authenticated user
-    # ----------------------------------------------
+    # ==================================================
+    # STEP 10: FIND AUTHENTICATED USER
+    # ==================================================
 
     user = (
         db.query(User)
@@ -320,10 +923,23 @@ async def face_login(
     )
 
     if not user:
+
         logger.error(
             "Face template belongs to missing user. "
             "user_id=%s",
             user_id,
+        )
+
+        safe_audit_log(
+            db=db,
+            event_type="FACE_LOGIN_FAILED",
+            success=False,
+            user_id=user_id,
+            similarity=similarity,
+            details=(
+                "Face template belongs "
+                "to missing user"
+            ),
         )
 
         raise HTTPException(
@@ -337,16 +953,33 @@ async def face_login(
 
     # At this point:
     #
-    # 1. Face was detected
-    # 2. Face passed quality checks
-    # 3. Face matched a stored template
-    # 4. User was found in the database
+    # 1. Liveness passed
+    # 2. Exactly one face was detected
+    # 3. Anti-spoofing passed
+    # 4. SFace matched the face
+    # 5. User exists
     #
-    # Only NOW do we unlock the door.
+    # Only NOW:
+    #   - consume liveness session
+    #   - unlock door
+    #   - create JWT
+
+    # ----------------------------------------------
+    # Consume liveness session
+    # ----------------------------------------------
+
+    liveness_session_manager.remove_session(
+        session_id
+    )
+
+    # ----------------------------------------------
+    # Unlock door
+    # ----------------------------------------------
 
     door_unlocked = door_service.unlock()
 
     if door_unlocked:
+
         logger.info(
             "Face authentication successful. "
             "Door unlocked for user_id=%s",
@@ -354,11 +987,32 @@ async def face_login(
         )
 
     else:
+
         logger.error(
             "Face authentication successful but "
             "door failed to unlock. user_id=%s",
             user.id,
         )
+
+    # ----------------------------------------------
+    # Audit successful face authentication
+    # ----------------------------------------------
+
+    safe_audit_log(
+        db=db,
+        event_type="FACE_LOGIN_SUCCESS",
+        success=True,
+        user_id=user.id,
+        similarity=similarity,
+        details=(
+            "Face authentication successful; "
+            "anti-spoofing passed; "
+            f"anti_spoof_confidence="
+            f"{spoof_confidence:.4f}; "
+            f"door_unlock="
+            f"{'success' if door_unlocked else 'failed'}"
+        ),
+    )
 
     # ----------------------------------------------
     # Create JWT access token
@@ -388,6 +1042,14 @@ async def face_login(
             similarity,
             4,
         ),
+        "anti_spoofing": {
+            "is_real": True,
+            "class_id": spoof_class_id,
+            "confidence": round(
+                spoof_confidence,
+                4,
+            ),
+        },
         "door": (
             "unlocked"
             if door_unlocked

@@ -1,21 +1,27 @@
+import random
 import time
 from typing import Optional
 
 
 class LivenessDetector:
     """
-    Basic motion-based liveness detector.
+    Directional challenge-based liveness detector.
 
-    The detector observes the movement of a detected face across
-    multiple camera frames.
+    The detector observes the movement of a detected face
+    across multiple camera frames.
 
-    Liveness is considered successful when sufficient face movement
-    is detected across consecutive frames.
+    A random challenge is generated when the detector starts:
+
+        TURN_LEFT
+        TURN_RIGHT
+
+    The user must move their face in the requested direction.
 
     NOTE:
-        This is a basic anti-spoofing mechanism. It can help detect
-        static photos, but it is NOT a production-grade liveness
-        detection system against sophisticated replay/deepfake attacks.
+        This is still a basic anti-spoofing mechanism.
+        It is stronger than simple movement detection, but it is
+        NOT production-grade liveness detection against advanced
+        replay, deepfake, or 3D mask attacks.
     """
 
     # ---------------------------------------------------------
@@ -23,16 +29,30 @@ class LivenessDetector:
     # ---------------------------------------------------------
 
     MOVEMENT_THRESHOLD = 5.0
+
+    # Number of meaningful movements required.
     REQUIRED_MOVEMENTS = 2
 
-    # Once liveness passes, keep it valid for this many seconds.
-    LIVENESS_VALID_SECONDS = 3.0
+    # How long successful liveness remains valid.
+    LIVENESS_VALID_SECONDS = 10.0
 
-    # Maximum time allowed for a liveness attempt.
-    SESSION_TIMEOUT_SECONDS = 10.0
+    # Maximum time allowed for one liveness session.
+    SESSION_TIMEOUT_SECONDS = 60.0
 
-    def __init__(self):
-        self.previous_position: Optional[tuple[float, float]] = None
+    # Minimum directional movement required.
+    DIRECTION_THRESHOLD = 4.0
+
+    # ---------------------------------------------------------
+    # Constructor
+    # ---------------------------------------------------------
+
+    def __init__(
+        self,
+        challenge: Optional[str] = None,
+    ):
+        self.previous_position: Optional[
+            tuple[float, float]
+        ] = None
 
         self.movement_count = 0
 
@@ -41,6 +61,18 @@ class LivenessDetector:
         self.started_at = time.monotonic()
 
         self.completed = False
+
+        # Generate a random challenge if one was not supplied.
+        self.challenge = (
+            challenge
+            if challenge
+            else random.choice(
+                [
+                    "TURN_LEFT",
+                    "TURN_RIGHT",
+                ]
+            )
+        )
 
     # ---------------------------------------------------------
     # Reset detector
@@ -48,43 +80,82 @@ class LivenessDetector:
 
     def reset(self) -> None:
         """
-        Reset the detector so a new liveness attempt can begin.
+        Reset the detector and generate a new challenge.
         """
 
         self.previous_position = None
+
         self.movement_count = 0
+
         self.live_until = 0.0
+
         self.started_at = time.monotonic()
+
         self.completed = False
 
+        self.challenge = random.choice(
+            [
+                "TURN_LEFT",
+                "TURN_RIGHT",
+            ]
+        )
+
     # ---------------------------------------------------------
-    # Check whether session has timed out
+    # Session expiration
     # ---------------------------------------------------------
 
     def is_expired(self) -> bool:
         """
-        Return True if the liveness session exceeded its
-        maximum allowed duration.
+        Return True if the liveness session has timed out.
         """
 
-        elapsed = time.monotonic() - self.started_at
+        elapsed = (
+            time.monotonic()
+            - self.started_at
+        )
 
-        return elapsed > self.SESSION_TIMEOUT_SECONDS
+        return (
+            elapsed
+            > self.SESSION_TIMEOUT_SECONDS
+        )
 
     # ---------------------------------------------------------
-    # Check whether liveness has already passed
+    # Liveness status
     # ---------------------------------------------------------
 
     def is_live(self) -> bool:
         """
-        Return True while the successful liveness result
-        remains valid.
+        Return True while successful liveness remains valid.
         """
 
         if not self.completed:
             return False
 
-        return time.monotonic() < self.live_until
+        return (
+            time.monotonic()
+            < self.live_until
+        )
+
+    # ---------------------------------------------------------
+    # Challenge text
+    # ---------------------------------------------------------
+
+    def challenge_message(self) -> str:
+        """
+        Return a human-readable instruction.
+        """
+
+        if self.challenge == "TURN_LEFT":
+            return (
+                "Please slowly move your face to the left."
+            )
+
+        if self.challenge == "TURN_RIGHT":
+            return (
+                "Please slowly move your face to the right."
+            )
+
+        return "Please move your face."
 
     # ---------------------------------------------------------
     # Process one face frame
@@ -112,14 +183,14 @@ class LivenessDetector:
             return False
 
         # -----------------------------------------------------
-        # If already live, keep returning True until expiration
+        # Already live
         # -----------------------------------------------------
 
         if self.is_live():
             return True
 
         # -----------------------------------------------------
-        # Validate face data
+        # Validate face
         # -----------------------------------------------------
 
         if face is None:
@@ -130,7 +201,12 @@ class LivenessDetector:
             y = float(face[1])
             w = float(face[2])
             h = float(face[3])
-        except (TypeError, ValueError, IndexError):
+
+        except (
+            TypeError,
+            ValueError,
+            IndexError,
+        ):
             return False
 
         if w <= 0 or h <= 0:
@@ -140,14 +216,22 @@ class LivenessDetector:
         # Calculate face center
         # -----------------------------------------------------
 
-        current_x = x + (w / 2.0)
-        current_y = y + (h / 2.0)
+        current_x = (
+            x
+            + (w / 2.0)
+        )
+
+        current_y = (
+            y
+            + (h / 2.0)
+        )
 
         # -----------------------------------------------------
         # First frame
         # -----------------------------------------------------
 
         if self.previous_position is None:
+
             self.previous_position = (
                 current_x,
                 current_y,
@@ -156,39 +240,87 @@ class LivenessDetector:
             return False
 
         # -----------------------------------------------------
-        # Calculate movement
+        # Previous position
         # -----------------------------------------------------
 
-        previous_x, previous_y = self.previous_position
-
-        movement_x = abs(
-            current_x - previous_x
+        previous_x, previous_y = (
+            self.previous_position
         )
 
-        movement_y = abs(
-            current_y - previous_y
+        # Signed movement is important here.
+
+        delta_x = (
+            current_x
+            - previous_x
         )
+
+        delta_y = (
+            current_y
+            - previous_y
+        )
+
+        movement_x = abs(delta_x)
+
+        movement_y = abs(delta_y)
 
         total_movement = (
-            movement_x + movement_y
+            movement_x
+            + movement_y
         )
 
-        # Update previous position
+        # Update position.
+
         self.previous_position = (
             current_x,
             current_y,
         )
 
         # -----------------------------------------------------
-        # Detect meaningful movement
+        # Check directional movement
         # -----------------------------------------------------
 
-        if total_movement >= self.MOVEMENT_THRESHOLD:
+        correct_direction = False
+
+        if (
+            self.challenge
+            == "TURN_LEFT"
+        ):
+
+            # Face center must move left.
+
+            if (
+                delta_x
+                <= -self.DIRECTION_THRESHOLD
+            ):
+                correct_direction = True
+
+        elif (
+            self.challenge
+            == "TURN_RIGHT"
+        ):
+
+            # Face center must move right.
+
+            if (
+                delta_x
+                >= self.DIRECTION_THRESHOLD
+            ):
+                correct_direction = True
+
+        # -----------------------------------------------------
+        # Count valid movement
+        # -----------------------------------------------------
+
+        if (
+            total_movement
+            >= self.MOVEMENT_THRESHOLD
+            and correct_direction
+        ):
+
             self.movement_count += 1
 
         else:
-            # Slowly reduce the movement score instead of
-            # immediately resetting it.
+
             self.movement_count = max(
                 0,
                 self.movement_count - 1,
@@ -198,7 +330,10 @@ class LivenessDetector:
         # Liveness passed
         # -----------------------------------------------------
 
-        if self.movement_count >= self.REQUIRED_MOVEMENTS:
+        if (
+            self.movement_count
+            >= self.REQUIRED_MOVEMENTS
+        ):
 
             self.completed = True
 
@@ -214,25 +349,38 @@ class LivenessDetector:
         return False
 
     # ---------------------------------------------------------
-    # Status information
+    # Status
     # ---------------------------------------------------------
 
     def status(self) -> dict:
         """
-        Return the current liveness state.
-
-        Useful for API responses and debugging.
+        Return current liveness state.
         """
 
         return {
             "live": self.is_live(),
+
             "completed": self.completed,
-            "movement_count": self.movement_count,
-            "expired": self.is_expired(),
-            "remaining_seconds": max(
-                0.0,
-                self.live_until - time.monotonic(),
-            )
-            if self.completed
-            else 0.0,
+
+            "movement_count":
+                self.movement_count,
+
+            "challenge":
+                self.challenge,
+
+            "challenge_message":
+                self.challenge_message(),
+
+            "expired":
+                self.is_expired(),
+
+            "remaining_seconds": (
+                max(
+                    0.0,
+                    self.live_until
+                    - time.monotonic(),
+                )
+                if self.completed
+                else 0.0
+            ),
         }

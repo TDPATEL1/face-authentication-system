@@ -1,5 +1,6 @@
 import logging
 from typing import Optional
+from app.services.door_controller import DoorController
 
 import requests
 
@@ -7,7 +8,7 @@ import requests
 logger = logging.getLogger(__name__)
 
 
-class ESP32DoorController:
+class ESP32DoorController(DoorController):
     """
     Controller used by FastAPI to communicate with an ESP32.
 
