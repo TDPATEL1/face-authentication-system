@@ -22,6 +22,9 @@ from app.models.face_template import FaceTemplate
 from app.models.user import User
 from app.services.audit_service import AuditService
 from app.services.anti_spoofing import anti_spoofing_service
+from app.services.anti_spoofing_session import (
+    anti_spoofing_session_manager,
+)
 from app.services.face_enrollment import FaceEnrollmentService
 from app.services.face_login import FaceLoginService
 from app.services.face_matching import FaceMatchingService
@@ -509,6 +512,263 @@ async def process_liveness_frame(
             session.detector.movement_count,
         "message":
             session.detector.challenge_message(),
+    }
+
+# ==================================================
+# ANTI-SPOOFING SESSION START
+# ==================================================
+
+@router.post(
+    "/anti-spoof/start",
+    status_code=status.HTTP_200_OK,
+)
+async def start_anti_spoofing():
+    """
+    Start a short-lived multi-frame anti-spoofing
+    verification session.
+    """
+
+    session_id = (
+        anti_spoofing_session_manager.create_session()
+    )
+
+    logger.info(
+        "Anti-spoofing session created. "
+        "session_id=%s",
+        session_id,
+    )
+
+    return {
+        "message": "Anti-spoofing session started",
+        "session_id": session_id,
+        "expires_in": (
+            anti_spoofing_session_manager
+            .SESSION_TIMEOUT_SECONDS
+        ),
+        "required_frames": (
+            anti_spoofing_session_manager
+            .REQUIRED_FRAMES
+        ),
+    }
+
+# ==================================================
+# ANTI-SPOOFING FRAME
+# ==================================================
+
+@router.post(
+    "/anti-spoof/frame",
+    status_code=status.HTTP_200_OK,
+)
+async def process_anti_spoofing_frame(
+    session_id: str,
+    image: UploadFile | None = File(None),
+    file: UploadFile | None = File(None),
+):
+    """
+    Process one frame through MiniFASNetV2.
+
+    Multiple frames are collected under the same
+    anti-spoofing session.
+    """
+
+    session = (
+        anti_spoofing_session_manager.get_session(
+            session_id
+        )
+    )
+
+    if session is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Anti-spoofing session "
+                "is invalid or expired"
+            ),
+        )
+
+    upload = image or file
+
+    if upload is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "No image file provided "
+                "in form data"
+            ),
+        )
+
+    frame = await decode_upload_image(upload)
+
+    # ----------------------------------------------
+    # Detect face
+    # ----------------------------------------------
+
+    try:
+
+        faces = await run_in_threadpool(
+            face_matcher.detector.detect,
+            frame,
+        )
+
+    except Exception:
+
+        logger.error(
+            "Anti-spoofing face detection error",
+            exc_info=True,
+        )
+
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Could not process "
+                "anti-spoofing frame"
+            ),
+        )
+
+    if len(faces) == 0:
+        return {
+            "status": "no_face",
+            "message": "No face detected.",
+        }
+
+    if len(faces) > 1:
+        return {
+            "status": "multiple_faces",
+            "message": (
+                "Multiple faces detected. "
+                "Only one person should be visible."
+            ),
+        }
+
+    face = faces[0]
+
+    # ----------------------------------------------
+    # MiniFASNetV2 prediction
+    # ----------------------------------------------
+
+    try:
+
+        prediction = await run_in_threadpool(
+            anti_spoofing_service.predict,
+            frame,
+            face,
+        )
+
+    except Exception:
+
+        logger.error(
+            "Anti-spoofing prediction error",
+            exc_info=True,
+        )
+
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Anti-spoofing prediction failed"
+            ),
+        )
+
+    # ----------------------------------------------
+    # Store prediction
+    # ----------------------------------------------
+
+    session = (
+        anti_spoofing_session_manager.add_prediction(
+            session_id,
+            prediction,
+        )
+    )
+
+    if session is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Anti-spoofing session "
+                "is invalid or expired"
+            ),
+        )
+
+    frame_number = len(
+        session.predictions
+    )
+
+    # ----------------------------------------------
+    # Check whether enough frames are available
+    # ----------------------------------------------
+
+    if not anti_spoofing_session_manager.is_ready(
+        session_id
+    ):
+
+        return {
+            "status": "checking",
+            "frame_number": frame_number,
+            "required_frames": (
+                anti_spoofing_session_manager
+                .REQUIRED_FRAMES
+            ),
+            "class_id": prediction["class_id"],
+            "confidence": round(
+                prediction["confidence"],
+                4,
+            ),
+            "is_real": (
+                prediction["class_id"]
+                == ANTI_SPOOF_REAL_CLASS_ID
+                and prediction["confidence"]
+                >= ANTI_SPOOF_MIN_CONFIDENCE
+            ),
+        }
+
+    # ----------------------------------------------
+    # Calculate final multi-frame result
+    # ----------------------------------------------
+
+    result = (
+        anti_spoofing_session_manager
+        .get_result(session_id)
+    )
+
+    if result is None:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Could not calculate "
+                "anti-spoofing result"
+            ),
+        )
+
+    # ----------------------------------------------
+    # Consume completed session
+    # ----------------------------------------------
+
+    anti_spoofing_session_manager.remove_session(
+        session_id
+    )
+
+    logger.info(
+        "Multi-frame anti-spoofing completed. "
+        "session_id=%s result=%s",
+        session_id,
+        result,
+    )
+
+    if result["is_real"]:
+
+        return {
+            "status": "passed",
+            "message": (
+                "Anti-spoofing verification successful"
+            ),
+            **result,
+        }
+
+    return {
+        "status": "failed",
+        "message": (
+            "Anti-spoofing verification failed"
+        ),
+        **result,
     }
 
 

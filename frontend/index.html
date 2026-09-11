@@ -1,459 +1,466 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Face Authentication System</title>
+```
+<title>Face Authentication System</title>
 
-    <style>
-        * {
-            box-sizing: border-box;
-        }
+<style>
+    * {
+        box-sizing: border-box;
+    }
 
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: Arial, Helvetica, sans-serif;
-            background: #f4f6f8;
-            color: #222;
-        }
+    body {
+        margin: 0;
+        padding: 0;
+        font-family: Arial, Helvetica, sans-serif;
+        background: #f4f6f8;
+        color: #222;
+    }
 
-        .container {
-            width: 95%;
-            max-width: 900px;
-            margin: 30px auto;
-            background: white;
-            padding: 25px;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-        }
+    .container {
+        width: 95%;
+        max-width: 900px;
+        margin: 30px auto;
+        background: white;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    }
 
-        h1 {
-            text-align: center;
-            margin-bottom: 25px;
-        }
+    h1 {
+        text-align: center;
+        margin-bottom: 25px;
+    }
 
-        .tabs {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 25px;
-            flex-wrap: wrap;
-        }
+    .tabs {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 25px;
+        flex-wrap: wrap;
+    }
 
-        .tab-button {
-            flex: 1;
-            min-width: 140px;
-            padding: 12px;
-            border: none;
-            border-radius: 7px;
-            cursor: pointer;
-            background: #e9ecef;
-            font-size: 15px;
-        }
+    .tab-button {
+        flex: 1;
+        min-width: 140px;
+        padding: 12px;
+        border: none;
+        border-radius: 7px;
+        cursor: pointer;
+        background: #e9ecef;
+        font-size: 15px;
+    }
 
-        .tab-button.active {
-            background: #222;
-            color: white;
-        }
+    .tab-button.active {
+        background: #222;
+        color: white;
+    }
 
-        .section {
-            display: none;
-        }
+    .section {
+        display: none;
+    }
 
-        .section.active {
-            display: block;
-        }
+    .section.active {
+        display: block;
+    }
 
-        .form-group {
-            margin-bottom: 15px;
-        }
+    .form-group {
+        margin-bottom: 15px;
+    }
 
-        label {
-            display: block;
-            margin-bottom: 6px;
-            font-weight: bold;
-        }
+    label {
+        display: block;
+        margin-bottom: 6px;
+        font-weight: bold;
+    }
 
-        input {
-            width: 100%;
-            padding: 11px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            font-size: 15px;
-        }
+    input {
+        width: 100%;
+        padding: 11px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        font-size: 15px;
+    }
 
-        button {
-            padding: 11px 18px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            background: #222;
-            color: white;
-            font-size: 15px;
-            margin: 5px 5px 5px 0;
-        }
+    button {
+        padding: 11px 18px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        background: #222;
+        color: white;
+        font-size: 15px;
+        margin: 5px 5px 5px 0;
+    }
 
-        button:hover {
-            opacity: 0.9;
-        }
+    button:hover {
+        opacity: 0.9;
+    }
 
-        button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
+    button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
 
-        .camera-container {
-            margin-top: 20px;
-            text-align: center;
-        }
+    .camera-container {
+        margin-top: 20px;
+        text-align: center;
+    }
 
-        video {
-            width: 100%;
-            max-width: 640px;
-            min-height: 360px;
-            background: #111;
-            border-radius: 10px;
-            object-fit: cover;
-        }
+    video {
+        width: 100%;
+        max-width: 640px;
+        min-height: 360px;
+        background: #111;
+        border-radius: 10px;
+        object-fit: cover;
+    }
 
-        canvas {
-            display: none;
-        }
+    canvas {
+        display: none;
+    }
 
-        .status {
-            margin-top: 15px;
-            padding: 12px;
-            border-radius: 6px;
-            background: #f1f3f5;
-            white-space: pre-wrap;
-            word-break: break-word;
-        }
+    .status {
+        margin-top: 15px;
+        padding: 12px;
+        border-radius: 6px;
+        background: #f1f3f5;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
 
-        .success {
-            background: #d1e7dd;
-            color: #0f5132;
-        }
+    .success {
+        background: #d1e7dd;
+        color: #0f5132;
+    }
 
-        .error {
-            background: #f8d7da;
-            color: #842029;
-        }
+    .error {
+        background: #f8d7da;
+        color: #842029;
+    }
 
-        .info {
-            background: #cff4fc;
-            color: #055160;
-        }
+    .info {
+        background: #cff4fc;
+        color: #055160;
+    }
 
-        .warning {
-            background: #fff3cd;
-            color: #664d03;
-        }
+    .warning {
+        background: #fff3cd;
+        color: #664d03;
+    }
 
-        .user-info {
-            margin-top: 20px;
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 8px;
-        }
+    .user-info {
+        margin-top: 20px;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 8px;
+    }
 
-        .hidden {
-            display: none !important;
-        }
+    .hidden {
+        display: none !important;
+    }
 
-        .instruction {
-            padding: 12px;
-            margin: 15px 0;
-            background: #f8f9fa;
-            border-left: 4px solid #222;
-            border-radius: 5px;
-        }
+    .instruction {
+        padding: 12px;
+        margin: 15px 0;
+        background: #f8f9fa;
+        border-left: 4px solid #222;
+        border-radius: 5px;
+    }
 
-        .debug {
-            margin-top: 20px;
-            padding: 12px;
-            background: #111;
-            color: #00ff88;
-            border-radius: 6px;
-            font-family: Consolas, monospace;
-            font-size: 12px;
-            white-space: pre-wrap;
-            word-break: break-word;
-            max-height: 250px;
-            overflow-y: auto;
-        }
-    </style>
+    .debug {
+        margin-top: 20px;
+        padding: 12px;
+        background: #111;
+        color: #00ff88;
+        border-radius: 6px;
+        font-family: Consolas, monospace;
+        font-size: 12px;
+        white-space: pre-wrap;
+        word-break: break-word;
+        max-height: 250px;
+        overflow-y: auto;
+    }
+</style>
+```
+
 </head>
 
 <body>
 
 <div class="container">
 
-    <h1>Face Authentication System</h1>
-
-    <!-- ========================================================= -->
-    <!-- TABS -->
-    <!-- ========================================================= -->
-
-    <div class="tabs">
-
-        <button
-            type="button"
-            class="tab-button active"
-            data-section="register-section">
-            Register
-        </button>
-
-        <button
-            type="button"
-            class="tab-button"
-            data-section="login-section">
-            Password Login
-        </button>
-
-        <button
-            type="button"
-            class="tab-button"
-            data-section="face-register-section">
-            Face Register
-        </button>
-
-        <button
-            type="button"
-            class="tab-button"
-            data-section="face-login-section">
-            Face Login
-        </button>
-
-    </div>
-
-
-    <!-- ========================================================= -->
-    <!-- REGISTER -->
-    <!-- ========================================================= -->
-
-    <section id="register-section" class="section active">
-
-        <h2>Create Account</h2>
-
-        <form id="register-form">
-
-            <div class="form-group">
-                <label for="register-name">Name</label>
-
-                <input
-                    type="text"
-                    id="register-name"
-                    required>
-            </div>
-
-            <div class="form-group">
-                <label for="register-email">Email</label>
-
-                <input
-                    type="email"
-                    id="register-email"
-                    required>
-            </div>
-
-            <div class="form-group">
-                <label for="register-password">Password</label>
-
-                <input
-                    type="password"
-                    id="register-password"
-                    required>
-            </div>
-
-            <button type="submit">
-                Register
-            </button>
-
-        </form>
-
-        <div id="register-status" class="status hidden"></div>
-
-    </section>
-
-
-    <!-- ========================================================= -->
-    <!-- PASSWORD LOGIN -->
-    <!-- ========================================================= -->
-
-    <section id="login-section" class="section">
-
-        <h2>Password Login</h2>
-
-        <form id="login-form">
-
-            <div class="form-group">
-                <label for="login-email">Email</label>
-
-                <input
-                    type="email"
-                    id="login-email"
-                    required>
-            </div>
-
-            <div class="form-group">
-                <label for="login-password">Password</label>
-
-                <input
-                    type="password"
-                    id="login-password"
-                    required>
-            </div>
-
-            <button type="submit">
-                Login
-            </button>
-
-        </form>
-
-        <div id="login-status" class="status hidden"></div>
-
-    </section>
-
-
-    <!-- ========================================================= -->
-    <!-- FACE REGISTER -->
-    <!-- ========================================================= -->
-
-    <section id="face-register-section" class="section">
-
-        <h2>Face Registration</h2>
-
-        <div class="instruction">
-            You must be logged in with your password before registering
-            your face.
-        </div>
-
-        <div>
-
-            <button
-                type="button"
-                id="start-face-register-camera">
-                Start Camera
-            </button>
-
-            <button
-                type="button"
-                id="capture-face-register"
-                disabled>
-                Capture & Register Face
-            </button>
-
-            <button
-                type="button"
-                id="stop-face-register-camera"
-                disabled>
-                Stop Camera
-            </button>
-
-        </div>
-
-        <div class="camera-container">
-
-            <video
-                id="face-register-video"
-                autoplay
-                playsinline>
-            </video>
-
-            <canvas
-                id="face-register-canvas">
-            </canvas>
-
-        </div>
-
-        <div
-            id="face-register-status"
-            class="status hidden">
-        </div>
-
-    </section>
-
-
-    <!-- ========================================================= -->
-    <!-- FACE LOGIN -->
-    <!-- ========================================================= -->
-
-    <section id="face-login-section" class="section">
-
-        <h2>Face Login With Liveness Detection</h2>
-
-        <div class="instruction">
-            <strong>Instructions:</strong><br>
-            1. Start the camera.<br>
-            2. Click "Capture & Login".<br>
-            3. The system will automatically start a liveness session.<br>
-            4. Slowly move your head slightly left and right.<br>
-            5. After liveness passes, the system will perform face login.
-        </div>
-
-        <div>
-
-            <button
-                type="button"
-                id="start-face-login-camera">
-                Start Camera
-            </button>
-
-            <button
-                type="button"
-                id="face-login-button"
-                disabled>
-                Capture & Login
-            </button>
-
-            <button
-                type="button"
-                id="stop-face-login-camera"
-                disabled>
-                Stop Camera
-            </button>
-
-        </div>
-
-        <div class="camera-container">
-
-            <video
-                id="face-login-video"
-                autoplay
-                playsinline>
-            </video>
-
-            <canvas
-                id="face-login-canvas">
-            </canvas>
-
-        </div>
-
-        <div
-            id="face-login-status"
-            class="status hidden">
-        </div>
-
-        <div
-            id="face-login-user"
-            class="user-info hidden">
-        </div>
-
-    </section>
-
-
-    <!-- ========================================================= -->
-    <!-- DEBUG -->
-    <!-- ========================================================= -->
-
-    <div
-        id="debug-output"
-        class="debug">
-        Frontend loaded.
-    </div>
+```
+<h1>Face Authentication System</h1>
+
+<!-- ========================================================= -->
+<!-- TABS -->
+<!-- ========================================================= -->
+
+<div class="tabs">
+
+    <button
+        type="button"
+        class="tab-button active"
+        data-section="register-section">
+        Register
+    </button>
+
+    <button
+        type="button"
+        class="tab-button"
+        data-section="login-section">
+        Password Login
+    </button>
+
+    <button
+        type="button"
+        class="tab-button"
+        data-section="face-register-section">
+        Face Register
+    </button>
+
+    <button
+        type="button"
+        class="tab-button"
+        data-section="face-login-section">
+        Face Login
+    </button>
 
 </div>
 
+
+<!-- ========================================================= -->
+<!-- REGISTER -->
+<!-- ========================================================= -->
+
+<section id="register-section" class="section active">
+
+    <h2>Create Account</h2>
+
+    <form id="register-form">
+
+        <div class="form-group">
+            <label for="register-name">Name</label>
+
+            <input
+                type="text"
+                id="register-name"
+                required>
+        </div>
+
+        <div class="form-group">
+            <label for="register-email">Email</label>
+
+            <input
+                type="email"
+                id="register-email"
+                required>
+        </div>
+
+        <div class="form-group">
+            <label for="register-password">Password</label>
+
+            <input
+                type="password"
+                id="register-password"
+                required>
+        </div>
+
+        <button type="submit">
+            Register
+        </button>
+
+    </form>
+
+    <div id="register-status" class="status hidden"></div>
+
+</section>
+
+
+<!-- ========================================================= -->
+<!-- PASSWORD LOGIN -->
+<!-- ========================================================= -->
+
+<section id="login-section" class="section">
+
+    <h2>Password Login</h2>
+
+    <form id="login-form">
+
+        <div class="form-group">
+            <label for="login-email">Email</label>
+
+            <input
+                type="email"
+                id="login-email"
+                required>
+        </div>
+
+        <div class="form-group">
+            <label for="login-password">Password</label>
+
+            <input
+                type="password"
+                id="login-password"
+                required>
+        </div>
+
+        <button type="submit">
+            Login
+        </button>
+
+    </form>
+
+    <div id="login-status" class="status hidden"></div>
+
+</section>
+
+
+<!-- ========================================================= -->
+<!-- FACE REGISTER -->
+<!-- ========================================================= -->
+
+<section id="face-register-section" class="section">
+
+    <h2>Face Registration</h2>
+
+    <div class="instruction">
+        You must be logged in with your password before registering
+        your face.
+    </div>
+
+    <div>
+
+        <button
+            type="button"
+            id="start-face-register-camera">
+            Start Camera
+        </button>
+
+        <button
+            type="button"
+            id="capture-face-register"
+            disabled>
+            Capture & Register Face
+        </button>
+
+        <button
+            type="button"
+            id="stop-face-register-camera"
+            disabled>
+            Stop Camera
+        </button>
+
+    </div>
+
+    <div class="camera-container">
+
+        <video
+            id="face-register-video"
+            autoplay
+            playsinline>
+        </video>
+
+        <canvas
+            id="face-register-canvas">
+        </canvas>
+
+    </div>
+
+    <div
+        id="face-register-status"
+        class="status hidden">
+    </div>
+
+</section>
+
+
+<!-- ========================================================= -->
+<!-- FACE LOGIN -->
+<!-- ========================================================= -->
+
+<section id="face-login-section" class="section">
+
+    <h2>Face Login With Liveness + Anti-Spoofing</h2>
+
+    <div class="instruction">
+        <strong>Instructions:</strong><br>
+        1. Start the camera.<br>
+        2. Click "Capture & Login".<br>
+        3. Complete the liveness challenge.<br>
+        4. Keep your face visible while anti-spoofing is checked.<br>
+        5. The system analyzes multiple camera frames.<br>
+        6. After anti-spoofing passes, face recognition will run.<br>
+        7. If authentication succeeds, the door will unlock.
+    </div>
+
+    <div>
+
+        <button
+            type="button"
+            id="start-face-login-camera">
+            Start Camera
+        </button>
+
+        <button
+            type="button"
+            id="face-login-button"
+            disabled>
+            Capture & Login
+        </button>
+
+        <button
+            type="button"
+            id="stop-face-login-camera"
+            disabled>
+            Stop Camera
+        </button>
+
+    </div>
+
+    <div class="camera-container">
+
+        <video
+            id="face-login-video"
+            autoplay
+            playsinline>
+        </video>
+
+        <canvas
+            id="face-login-canvas">
+        </canvas>
+
+    </div>
+
+    <div
+        id="face-login-status"
+        class="status hidden">
+    </div>
+
+    <div
+        id="face-login-user"
+        class="user-info hidden">
+    </div>
+
+</section>
+
+
+<!-- ========================================================= -->
+<!-- DEBUG -->
+<!-- ========================================================= -->
+
+<div
+    id="debug-output"
+    class="debug">
+    Frontend loaded.
+</div>
+```
+
+</div>
 
 <script>
 
@@ -473,9 +480,14 @@
     let faceRegisterStream = null;
     let faceLoginStream = null;
 
+    // Liveness session
     let livenessSessionId = null;
 
+    // Multi-frame anti-spoofing session
+    let antiSpoofSessionId = null;
+
     let livenessRunning = false;
+    let antiSpoofRunning = false;
 
 
     // ============================================================
@@ -1215,6 +1227,7 @@
                     stopFaceLoginCamera();
 
                     livenessSessionId = null;
+                    antiSpoofSessionId = null;
 
                     faceLoginStream =
                         await startCamera(
@@ -1278,8 +1291,10 @@
     function stopFaceLoginCamera() {
 
         livenessRunning = false;
+        antiSpoofRunning = false;
 
         livenessSessionId = null;
+        antiSpoofSessionId = null;
 
         if (faceLoginStream) {
 
@@ -1308,93 +1323,92 @@
 
 
     // ============================================================
-// START LIVENESS SESSION
-// ============================================================
+    // START LIVENESS SESSION
+    // ============================================================
 
-async function startLivenessSession() {
-
-    debug(
-        "Starting liveness session..."
-    );
-
-    const response =
-        await apiRequest(
-            `${API_URL}/api/v1/face/liveness/start`,
-            {
-                method: "POST"
-            }
-        );
-
-    const data =
-        await response.json();
-
-    debug(
-        "Liveness start response: " +
-        JSON.stringify(data)
-    );
-
-    if (!response.ok) {
-
-        throw new Error(
-            data.detail ||
-            data.message ||
-            "Could not start liveness session."
-        );
-    }
-
-    if (!data.session_id) {
-
-        throw new Error(
-            "Backend did not return a liveness session_id."
-        );
-    }
-
-    // ------------------------------------------------------------
-    // Store liveness session ID
-    // ------------------------------------------------------------
-
-    livenessSessionId =
-        data.session_id;
-
-    debug(
-        "Liveness session ID created: " +
-        livenessSessionId
-    );
-
-    // ------------------------------------------------------------
-    // Store challenge information
-    // ------------------------------------------------------------
-
-    if (data.challenge) {
+    async function startLivenessSession() {
 
         debug(
-            "Liveness challenge: " +
-            data.challenge
-        );
-    }
-
-    if (data.challenge_message) {
-
-        debug(
-            "Liveness instruction: " +
-            data.challenge_message
+            "Starting liveness session..."
         );
 
-        // Display challenge to the user if the element exists
-        const livenessMessage =
-            document.getElementById(
-                "livenessMessage"
+        const response =
+            await apiRequest(
+                `${API_URL}/api/v1/face/liveness/start`,
+                {
+                    method: "POST"
+                }
             );
 
-        if (livenessMessage) {
+        const data =
+            await response.json();
 
-            livenessMessage.textContent =
-                data.challenge_message;
+        debug(
+            "Liveness start response: " +
+            JSON.stringify(data)
+        );
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.detail ||
+                data.message ||
+                "Could not start liveness session."
+            );
         }
-    }
 
-    return data;
-}
+        if (!data.session_id) {
+
+            throw new Error(
+                "Backend did not return a liveness session_id."
+            );
+        }
+
+        // ------------------------------------------------------------
+        // Store liveness session ID
+        // ------------------------------------------------------------
+
+        livenessSessionId =
+            data.session_id;
+
+        debug(
+            "Liveness session ID created: " +
+            livenessSessionId
+        );
+
+        // ------------------------------------------------------------
+        // Store challenge information
+        // ------------------------------------------------------------
+
+        if (data.challenge) {
+
+            debug(
+                "Liveness challenge: " +
+                data.challenge
+            );
+        }
+
+        if (data.challenge_message) {
+
+            debug(
+                "Liveness instruction: " +
+                data.challenge_message
+            );
+
+            const livenessMessage =
+                document.getElementById(
+                    "livenessMessage"
+                );
+
+            if (livenessMessage) {
+
+                livenessMessage.textContent =
+                    data.challenge_message;
+            }
+        }
+
+        return data;
+    }
 
 
     // ============================================================
@@ -1431,8 +1445,8 @@ async function startLivenessSession() {
         );
 
 
-        // IMPORTANT:
-        // session_id MUST be a QUERY PARAMETER.
+        // session_id MUST be a query parameter.
+
         const url =
             `${API_URL}/api/v1/face/liveness/frame` +
             `?session_id=${encodeURIComponent(
@@ -1513,7 +1527,7 @@ async function startLivenessSession() {
 
                     showStatus(
                         "face-login-status",
-                        "Liveness passed. Recognizing face...",
+                        "Liveness passed. Starting anti-spoofing verification...",
                         "success"
                     );
 
@@ -1584,6 +1598,318 @@ async function startLivenessSession() {
 
 
     // ============================================================
+    // START MULTI-FRAME ANTI-SPOOFING SESSION
+    // ============================================================
+
+    async function startAntiSpoofingSession() {
+
+        debug(
+            "Starting multi-frame anti-spoofing session..."
+        );
+
+        const response =
+            await apiRequest(
+                `${API_URL}/api/v1/face/anti-spoof/start`,
+                {
+                    method: "POST"
+                }
+            );
+
+        const data =
+            await response.json();
+
+        debug(
+            "Anti-spoofing start response: " +
+            JSON.stringify(data)
+        );
+
+        if (!data.session_id) {
+
+            throw new Error(
+                "Backend did not return an anti-spoofing session_id."
+            );
+        }
+
+        antiSpoofSessionId =
+            data.session_id;
+
+        debug(
+            "Anti-spoofing session ID created: " +
+            antiSpoofSessionId
+        );
+
+        return data;
+    }
+
+
+    // ============================================================
+    // SEND ONE ANTI-SPOOFING FRAME
+    // ============================================================
+
+    async function sendAntiSpoofingFrame() {
+
+        if (!antiSpoofSessionId) {
+
+            throw new Error(
+                "Anti-spoofing session ID is missing."
+            );
+        }
+
+        const dataURL =
+            captureVideoFrame(
+                $("face-login-video"),
+                $("face-login-canvas")
+            );
+
+        const blob =
+            await dataURLToBlob(
+                dataURL
+            );
+
+        const formData =
+            new FormData();
+
+        formData.append(
+            "image",
+            blob,
+            "anti-spoof.jpg"
+        );
+
+
+        // IMPORTANT:
+        // session_id MUST be a QUERY PARAMETER.
+
+        const url =
+            `${API_URL}/api/v1/face/anti-spoof/frame` +
+            `?session_id=${encodeURIComponent(
+                antiSpoofSessionId
+            )}`;
+
+
+        debug(
+            "Sending anti-spoofing frame: " +
+            url
+        );
+
+
+        const response =
+            await apiRequest(
+                url,
+                {
+                    method: "POST",
+                    body: formData
+                }
+            );
+
+
+        const data =
+            await response.json();
+
+
+        debug(
+            "Anti-spoofing response: " +
+            JSON.stringify(data)
+        );
+
+
+        return data;
+    }
+
+
+    // ============================================================
+    // RUN MULTI-FRAME ANTI-SPOOFING
+    // ============================================================
+
+    async function runAntiSpoofingCheck() {
+
+        antiSpoofRunning = true;
+
+        const session =
+            await startAntiSpoofingSession();
+
+        const requiredFrames =
+            Number(
+                session.required_frames || 5
+            );
+
+        showStatus(
+            "face-login-status",
+            `Liveness passed.\nChecking anti-spoofing...\nFrame 0/${requiredFrames}`,
+            "info"
+        );
+
+
+        for (
+            let frameIndex = 1;
+            frameIndex <= requiredFrames;
+            frameIndex++
+        ) {
+
+            if (!antiSpoofRunning) {
+
+                throw new Error(
+                    "Anti-spoofing verification was stopped."
+                );
+            }
+
+
+            try {
+
+                const result =
+                    await sendAntiSpoofingFrame();
+
+
+                // ------------------------------------------------
+                // NO FACE
+                // ------------------------------------------------
+
+                if (
+                    result.status ===
+                    "no_face"
+                ) {
+
+                    showStatus(
+                        "face-login-status",
+                        `Anti-spoofing: No face detected.\nFrame ${frameIndex}/${requiredFrames}\nKeep your face inside the camera.`,
+                        "warning"
+                    );
+
+                }
+
+
+                // ------------------------------------------------
+                // MULTIPLE FACES
+                // ------------------------------------------------
+
+                else if (
+                    result.status ===
+                    "multiple_faces"
+                ) {
+
+                    showStatus(
+                        "face-login-status",
+                        `Anti-spoofing: Multiple faces detected.\nFrame ${frameIndex}/${requiredFrames}\nOnly one person should be visible.`,
+                        "warning"
+                    );
+
+                }
+
+
+                // ------------------------------------------------
+                // CHECKING
+                // ------------------------------------------------
+
+                else if (
+                    result.status ===
+                    "checking"
+                ) {
+
+                    const frameNumber =
+                        result.frame_number ||
+                        frameIndex;
+
+                    const confidence =
+                        result.confidence !== undefined
+                            ? result.confidence
+                            : 0;
+
+                    const isReal =
+                        result.is_real === true;
+
+                    showStatus(
+                        "face-login-status",
+                        `Anti-spoofing verification...\nFrame ${frameNumber}/${requiredFrames}\nClass ID: ${result.class_id}\nConfidence: ${confidence}\nCurrent frame: ${isReal ? "REAL" : "SPOOF / UNCERTAIN"}`,
+                        isReal
+                            ? "success"
+                            : "warning"
+                    );
+
+                }
+
+
+                // ------------------------------------------------
+                // PASSED
+                // ------------------------------------------------
+
+                else if (
+                    result.status ===
+                    "passed"
+            )    {
+
+                    antiSpoofRunning = false;
+
+                    debug(
+                        "Multi-frame anti-spoofing PASSED."
+                    );
+
+                    showStatus(
+                        "face-login-status",
+                        `Liveness passed.\nAnti-spoofing passed.\n${result.real_frames}/${result.frames_analyzed} frames classified as real.\nAverage real confidence: ${result.average_real_confidence}\nRecognizing face...`,
+                        "success"
+                    );
+
+                    return true;
+                }
+
+
+                // ------------------------------------------------
+                // FAILED
+                // ------------------------------------------------
+
+                else if (
+                    result.status ===
+                    "failed"
+                ) {
+
+                    antiSpoofRunning = false;
+
+                    debug(
+                        "Multi-frame anti-spoofing FAILED: " +
+                        JSON.stringify(result)
+                    );
+
+                    throw new Error(
+                        `Anti-spoofing verification failed.\nReal frames: ${result.real_frames}/${result.frames_analyzed}\nAverage real confidence: ${result.average_real_confidence}`
+                    );
+                }
+
+
+                // ------------------------------------------------
+                // Wait between frames
+                // ------------------------------------------------
+
+                await new Promise(
+                    resolve =>
+                        setTimeout(
+                            resolve,
+                            250
+                        )
+                );
+
+
+            } catch (error) {
+
+                antiSpoofRunning = false;
+
+                debug(
+                    "Anti-spoofing error: " +
+                    error.message
+                );
+
+                throw error;
+            }
+        }
+
+
+        antiSpoofRunning = false;
+
+        throw new Error(
+            "Anti-spoofing verification did not complete."
+        );
+    }
+
+
+    // ============================================================
     // FINAL FACE LOGIN
     // ============================================================
 
@@ -1621,11 +1947,7 @@ async function startLivenessSession() {
         );
 
 
-        // ========================================================
-        // THIS IS THE IMPORTANT FIX
-        //
         // session_id MUST be included in the URL.
-        // ========================================================
 
         const loginURL =
             `${API_URL}/api/v1/face/login` +
@@ -1707,7 +2029,7 @@ async function startLivenessSession() {
 
                     // ------------------------------------------------
                     // STEP 2
-                    // Perform multiple liveness frames
+                    // Perform liveness verification
                     // ------------------------------------------------
 
                     const live =
@@ -1724,6 +2046,23 @@ async function startLivenessSession() {
 
                     // ------------------------------------------------
                     // STEP 3
+                    // Multi-frame anti-spoofing
+                    // ------------------------------------------------
+
+                    const antiSpoofPassed =
+                        await runAntiSpoofingCheck();
+
+
+                    if (!antiSpoofPassed) {
+
+                        throw new Error(
+                            "Anti-spoofing verification failed."
+                        );
+                    }
+
+
+                    // ------------------------------------------------
+                    // STEP 4
                     // Final face authentication
                     // ------------------------------------------------
 
@@ -1732,7 +2071,7 @@ async function startLivenessSession() {
 
 
                     // ------------------------------------------------
-                    // STEP 4
+                    // STEP 5
                     // Save JWT
                     // ------------------------------------------------
 
@@ -1747,7 +2086,7 @@ async function startLivenessSession() {
 
 
                     // ------------------------------------------------
-                    // STEP 5
+                    // STEP 6
                     // Display result
                     // ------------------------------------------------
 
@@ -1780,6 +2119,15 @@ async function startLivenessSession() {
 
                         message +=
                             `\nSimilarity: ${result.similarity}`;
+                    }
+
+
+                    if (
+                        result.anti_spoofing
+                    ) {
+
+                        message +=
+                            `\nAnti-spoofing: REAL`;
                     }
 
 
@@ -1824,9 +2172,11 @@ async function startLivenessSession() {
                     );
 
 
-                    // Session has already been consumed
-                    // by backend after successful login.
+                    // Backend consumes the liveness session
+                    // after successful login.
+
                     livenessSessionId = null;
+                    antiSpoofSessionId = null;
 
 
                 } catch (error) {
@@ -1845,11 +2195,15 @@ async function startLivenessSession() {
                     );
 
 
-                    // Clear session so next attempt
-                    // starts a completely new liveness flow.
+                    // Clear sessions so the next attempt
+                    // starts a completely new flow.
+
                     livenessSessionId = null;
+                    antiSpoofSessionId = null;
 
                 } finally {
+
+                    antiSpoofRunning = false;
 
                     $("face-login-button")
                         .disabled = false;

@@ -37,7 +37,7 @@ class AntiSpoofingService:
     # The first standalone test will expose the raw probabilities
     # so we can verify the mapping before connecting this service
     # to authentication.
-    REAL_CLASS_ID = 1
+    REAL_CLASS_ID = 2
 
     def __init__(self):
         if not self.MODEL_PATH.exists():
