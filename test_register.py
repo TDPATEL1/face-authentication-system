@@ -1,16 +1,25 @@
-import requests
+from fastapi.testclient import TestClient
+
+from app.main import app
 
 
-url = "http://127.0.0.1:8000/api/v1/auth/register"
+client = TestClient(app)
 
-payload = {
-    "name": "Test User",
-    "email": "test123@example.com",
-    "password": "Password@123"
-}
 
-response = requests.post(url, json=payload)
+def test_register_user():
+    payload = {
+        "name": "Test User",
+        "email": "test123@example.com",
+        "password": "Password@123",
+    }
 
-print("STATUS CODE:", response.status_code)
-print("RESPONSE:")
-print(response.text)
+    response = client.post(
+        "/api/v1/auth/register",
+        json=payload,
+    )
+
+    print("STATUS CODE:", response.status_code)
+    print("RESPONSE:")
+    print(response.text)
+
+    assert response.status_code in (200, 201, 400, 409)

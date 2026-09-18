@@ -12,11 +12,14 @@ from app.services.face_matching import FaceMatchingService
 client = TestClient(app)
 
 
+from app.models.audit_log import AuditLog
+
 @pytest.fixture(autouse=True)
 def clean_test_users():
     db = SessionLocal()
     users = db.query(User).filter(User.email.like('%@testsuite.com')).all()
     for u in users:
+        db.query(AuditLog).filter(AuditLog.user_id == u.id).delete()
         db.delete(u)
     db.commit()
     db.close()
@@ -24,6 +27,7 @@ def clean_test_users():
     db = SessionLocal()
     users = db.query(User).filter(User.email.like('%@testsuite.com')).all()
     for u in users:
+        db.query(AuditLog).filter(AuditLog.user_id == u.id).delete()
         db.delete(u)
     db.commit()
     db.close()
@@ -127,12 +131,34 @@ def test_face_enrollment_validation():
     assert 'No face detected' in res_no_face.json()['detail']
 
 
-def test_face_login_no_face():
+def test_face_login_invalid_session_rejected():
     no_face = np.zeros((300, 300, 3), dtype=np.uint8)
-    _, encoded_no_face = cv2.imencode('.jpg', no_face)
-    res = client.post(
-        '/api/v1/face/login',
-        files={'image': ('noface.jpg', encoded_no_face.tobytes(), 'image/jpeg')}
+
+    _, encoded_no_face = cv2.imencode(
+        ".jpg",
+        no_face
     )
-    assert res.status_code == 400
-    assert 'No face detected' in res.json()['detail']
+
+    res = client.post(
+        "/api/v1/face/login?session_id=dummy_session_123",
+        files={
+            "image": (
+                "noface.jpg",
+                encoded_no_face.tobytes(),
+                "image/jpeg",
+            )
+        },
+    )
+
+    assert res.status_code == 401
+
+    detail = res.json()["detail"].lower()
+
+    assert (
+        "invalid" in detail
+        or "expired" in detail
+        or "authentication requires" in detail
+    )
+
+    # The request must be rejected before face processing.
+    assert "no face detected" not in detail

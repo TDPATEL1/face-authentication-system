@@ -1,0 +1,295 @@
+import logging
+import secrets
+import threading
+import time
+from enum import Enum
+from typing import Any, Dict, Optional
+
+from face_service.liveness import LivenessDetector
+
+logger = logging.getLogger(__name__)
+
+
+class AuthState(str, Enum):
+    CREATED = "CREATED"
+    LIVENESS_PASSED = "LIVENESS_PASSED"
+    ANTI_SPOOF_PASSED = "ANTI_SPOOF_PASSED"
+    FACE_MATCHED = "FACE_MATCHED"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    EXPIRED = "EXPIRED"
+
+
+class UnifiedAuthSession:
+    def __init__(self, session_id: str):
+        self.session_id: str = session_id
+        self.state: AuthState = AuthState.CREATED
+        self.created_at: float = time.monotonic()
+        self.last_activity: float = time.monotonic()
+
+        # Embedded state objects
+        self.liveness_detector: LivenessDetector = LivenessDetector()
+        self.anti_spoof_predictions: list[Dict[str, Any]] = []
+
+        # Authentication results
+        self.matched_user_id: Optional[int] = None
+        self.matched_similarity: Optional[float] = None
+        self.anti_spoof_summary: Optional[Dict[str, Any]] = None
+
+    def is_expired(self, timeout_seconds: float) -> bool:
+        if self.state in (AuthState.COMPLETED, AuthState.FAILED, AuthState.EXPIRED):
+            return True
+        return (time.monotonic() - self.created_at) > timeout_seconds
+
+
+class UnifiedAuthSessionManager:
+    """
+    Thread-safe state-machine manager for unified authentication sessions.
+
+    Flow:
+        CREATED -> LIVENESS_PASSED -> ANTI_SPOOF_PASSED -> FACE_MATCHED -> COMPLETED
+
+    Rules:
+        - Out-of-order calls fail immediately and mark the session as FAILED.
+        - Expiration transition to EXPIRED.
+        - One-time completion deletes the session to prevent reuse.
+    """
+
+    SESSION_TIMEOUT_SECONDS: float = 90.0
+    REQUIRED_ANTI_SPOOF_FRAMES: int = 5
+    MIN_REAL_ANTI_SPOOF_FRAMES: int = 4
+    MIN_AVERAGE_ANTI_SPOOF_CONFIDENCE: float = 0.80
+
+    def __init__(self):
+        self.sessions: Dict[str, UnifiedAuthSession] = {}
+        self._lock = threading.RLock()
+
+    def create_session(self) -> str:
+        """
+        Generates a new session ID and initializes the unified session state.
+        """
+        with self._lock:
+            self.cleanup_expired_sessions()
+            session_id = secrets.token_urlsafe(32)
+            self.sessions[session_id] = UnifiedAuthSession(session_id=session_id)
+            logger.info("Unified auth session created: session_id=%s", session_id)
+            return session_id
+
+    def get_session(self, session_id: str) -> Optional[UnifiedAuthSession]:
+        """
+        Retrieves a valid, unexpired session. Automatically expires timed-out sessions.
+        """
+        with self._lock:
+            session = self.sessions.get(session_id)
+            if not session:
+                return None
+
+            if session.is_expired(self.SESSION_TIMEOUT_SECONDS):
+                logger.warning("Unified auth session expired: session_id=%s", session_id)
+                session.state = AuthState.EXPIRED
+                self.sessions.pop(session_id, None)
+                return None
+
+            return session
+
+    def process_liveness_frame(self, session_id: str, face: Any) -> Dict[str, Any]:
+        """
+        Processes a face detection result for liveness in state CREATED or LIVENESS_PASSED.
+        """
+        with self._lock:
+            session = self.get_session(session_id)
+            if not session:
+                return {
+                    "valid": False,
+                    "reason": "Session invalid or expired",
+                    "state": AuthState.EXPIRED.value,
+                }
+
+            if session.state not in (AuthState.CREATED, AuthState.LIVENESS_PASSED):
+                logger.warning(
+                    "Invalid state for liveness check: session_id=%s state=%s",
+                    session_id,
+                    session.state,
+                )
+                self.invalidate_session(session_id)
+                return {
+                    "valid": False,
+                    "reason": f"Liveness cannot be run in state {session.state.value}",
+                    "state": AuthState.FAILED.value,
+                }
+
+            session.last_activity = time.monotonic()
+            liveness_passed = session.liveness_detector.check(face)
+
+            if liveness_passed:
+                session.state = AuthState.LIVENESS_PASSED
+                logger.info("Liveness passed for session_id=%s", session_id)
+
+            return {
+                "valid": True,
+                "liveness": session.state == AuthState.LIVENESS_PASSED,
+                "status": "passed" if session.state == AuthState.LIVENESS_PASSED else "checking",
+                "challenge": session.liveness_detector.challenge,
+                "challenge_message": session.liveness_detector.challenge_message(),
+                "movement_count": session.liveness_detector.movement_count,
+                "state": session.state.value,
+            }
+
+    def add_anti_spoof_prediction(
+        self, session_id: str, prediction: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Adds a MiniFASNetV2 anti-spoofing frame prediction.
+        Requires state LIVENESS_PASSED.
+        """
+        with self._lock:
+            session = self.get_session(session_id)
+            if not session:
+                return {
+                    "valid": False,
+                    "reason": "Session invalid or expired",
+                    "state": AuthState.EXPIRED.value,
+                }
+
+            if session.state != AuthState.LIVENESS_PASSED:
+                logger.warning(
+                    "Invalid state for anti-spoof frame: session_id=%s state=%s",
+                    session_id,
+                    session.state,
+                )
+                self.invalidate_session(session_id)
+                return {
+                    "valid": False,
+                    "reason": "Liveness verification must pass before anti-spoofing",
+                    "state": AuthState.FAILED.value,
+                }
+
+            session.last_activity = time.monotonic()
+            session.anti_spoof_predictions.append(prediction)
+            frame_count = len(session.anti_spoof_predictions)
+
+            if frame_count < self.REQUIRED_ANTI_SPOOF_FRAMES:
+                return {
+                    "valid": True,
+                    "status": "checking",
+                    "frame_number": frame_count,
+                    "required_frames": self.REQUIRED_ANTI_SPOOF_FRAMES,
+                    "state": session.state.value,
+                }
+
+            # Calculate multi-frame result
+            real_predictions = [
+                p for p in session.anti_spoof_predictions if p.get("class_id") == 2
+            ]
+            real_count = len(real_predictions)
+            confidences = [float(p.get("confidence", 0.0)) for p in real_predictions]
+            avg_confidence = sum(confidences) / len(confidences) if confidences else 0.0
+
+            is_real = (
+                real_count >= self.MIN_REAL_ANTI_SPOOF_FRAMES
+                and avg_confidence >= self.MIN_AVERAGE_ANTI_SPOOF_CONFIDENCE
+            )
+
+            summary = {
+                "is_real": is_real,
+                "frames_analyzed": frame_count,
+                "real_frames": real_count,
+                "spoof_frames": frame_count - real_count,
+                "average_real_confidence": round(avg_confidence, 4),
+            }
+
+            session.anti_spoof_summary = summary
+
+            if is_real:
+                session.state = AuthState.ANTI_SPOOF_PASSED
+                logger.info("Anti-spoofing passed for session_id=%s", session_id)
+                return {
+                    "valid": True,
+                    "status": "passed",
+                    "state": session.state.value,
+                    **summary,
+                }
+            else:
+                logger.warning("Anti-spoofing failed for session_id=%s", session_id)
+                self.invalidate_session(session_id)
+                return {
+                    "valid": False,
+                    "status": "failed",
+                    "reason": "Anti-spoofing verification failed",
+                    "state": AuthState.FAILED.value,
+                    **summary,
+                }
+
+    def validate_and_consume_for_login(self, session_id: str) -> tuple[bool, str]:
+        """
+        Verifies that session is in state ANTI_SPOOF_PASSED before face matching.
+        If valid, allows face login to proceed.
+        """
+        with self._lock:
+            session = self.get_session(session_id)
+            if not session:
+                return False, "Session is invalid or expired"
+
+            if session.state != AuthState.ANTI_SPOOF_PASSED:
+                logger.warning(
+                    "Attempted face login in invalid state: session_id=%s state=%s",
+                    session_id,
+                    session.state,
+                )
+                self.invalidate_session(session_id)
+                return (
+                    False,
+                    f"Authentication requires liveness and anti-spoofing. Current state: {session.state.value}",
+                )
+
+            return True, "Session valid for face login"
+
+    def complete_session(self, session_id: str, user_id: int, similarity: float) -> bool:
+        """
+        Marks session as FACE_MATCHED then COMPLETED, and removes it (one-time consumption).
+        """
+        with self._lock:
+            session = self.sessions.get(session_id)
+            if not session or session.state != AuthState.ANTI_SPOOF_PASSED:
+                return False
+
+            session.matched_user_id = user_id
+            session.matched_similarity = similarity
+            session.state = AuthState.COMPLETED
+
+            # Consume session immediately to prevent reuse
+            self.sessions.pop(session_id, None)
+            logger.info(
+                "Unified auth session completed and consumed: session_id=%s user_id=%s",
+                session_id,
+                user_id,
+            )
+            return True
+
+    def invalidate_session(self, session_id: str) -> None:
+        """
+        Invalidates and destroys a session immediately.
+        """
+        with self._lock:
+            session = self.sessions.pop(session_id, None)
+            if session:
+                session.state = AuthState.FAILED
+                logger.info("Unified auth session invalidated: session_id=%s", session_id)
+
+    def cleanup_expired_sessions(self) -> None:
+        """
+        Removes all expired sessions.
+        """
+        with self._lock:
+            now = time.monotonic()
+            expired = [
+                sid
+                for sid, s in self.sessions.items()
+                if s.is_expired(self.SESSION_TIMEOUT_SECONDS)
+                or (now - s.created_at > self.SESSION_TIMEOUT_SECONDS)
+            ]
+            for sid in expired:
+                self.sessions.pop(sid, None)
+
+
+unified_auth_session_manager = UnifiedAuthSessionManager()

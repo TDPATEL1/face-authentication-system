@@ -7,7 +7,7 @@ db = SessionLocal()
 try:
     log = AuditService.log(
         db=db,
-        event_type="SYSTEM_TEST",
+        event_type="FACE_LOGIN_SUCCESS",
         success=True,
         details="Audit logging system test",
     )

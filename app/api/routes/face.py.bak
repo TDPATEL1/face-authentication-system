@@ -14,7 +14,6 @@ from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
 from app.api.dependencies import get_current_user
 from app.api.routes.door import door_service
 from app.core.database import get_db
@@ -30,8 +29,8 @@ from app.services.face_enrollment import FaceEnrollmentService
 from app.services.face_login import FaceLoginService
 from app.services.face_matching import FaceMatchingService
 from app.services.unified_auth_session import (
-    AuthState,
     unified_auth_session_manager,
+    AuthState,
 )
 from app.services.liveness_session import liveness_session_manager
 
@@ -75,8 +74,10 @@ face_login_service = FaceLoginService(
 
 ANTI_SPOOF_REAL_CLASS_ID = 2
 
-
 # Minimum confidence required for a REAL prediction.
+#
+# We start conservatively. This value can be tuned
+# after real-face and spoof testing.
 
 ANTI_SPOOF_MIN_CONFIDENCE = 0.80
 
@@ -94,8 +95,8 @@ def safe_audit_log(
     details: str | None = None,
 ) -> None:
     """
-    Write an audit event without allowing an audit
-    failure to break the main authentication operation.
+    Write an audit event without allowing an audit failure
+    to break the main authentication operation.
     """
 
     try:
@@ -109,166 +110,64 @@ def safe_audit_log(
         )
 
     except Exception:
-        # An audit failure must never break authentication,
-        # face recognition, liveness, or door control.
-        logger.exception(
-            "Audit logging failed: event=%s user_id=%s",
+        logger.error(
+            "Failed to write audit log. event=%s user_id=%s",
             event_type,
             user_id,
+            exc_info=True,
         )
 
-        # Roll back any failed SQLAlchemy transaction so the
-        # database session remains usable for the main operation.
-        try:
-            db.rollback()
-        except Exception:
-            logger.exception(
-                "Audit database rollback failed"
-            )
+        db.rollback()
 
 
 # ==================================================
 # Helper: Decode Uploaded Image
 # ==================================================
 
-async def decode_upload_image(upload: UploadFile) -> np.ndarray:
+async def decode_upload_image(
+    upload: UploadFile,
+) -> np.ndarray:
     """
-    Safely decode an uploaded face image.
+    Safely read and decode an uploaded image.
 
-    Security protections:
-    - Validates MIME type
-    - Limits compressed file size
-    - Rejects empty files
-    - Validates image decoding
-    - Limits width and height
-    - Limits total decoded pixels
+    Returns:
+        BGR NumPy image.
     """
 
-    # ----------------------------------------------
-    # Content-Type validation
-    # ----------------------------------------------
-
-    if not upload.content_type or not upload.content_type.startswith("image/"):
+    if (
+        not upload.content_type
+        or not upload.content_type.startswith("image/")
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Uploaded file must be an image",
+            detail="Uploaded file must be an image (JPEG/PNG)",
         )
 
-    # ----------------------------------------------
-    # File-size protection
-    # ----------------------------------------------
-
-    max_size = settings.MAX_FACE_IMAGE_SIZE_BYTES
-
-    # Read one extra byte so we can detect files larger
-    # than the configured limit.
-    image_bytes = await upload.read(max_size + 1)
+    image_bytes = await upload.read()
 
     if not image_bytes:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Uploaded image is empty",
+            detail="Uploaded image file is empty",
         )
 
-    if len(image_bytes) > max_size:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=(
-                f"Image file is too large. "
-                f"Maximum allowed size is {max_size // (1024 * 1024)} MB"
-            ),
-        )
-
-    # ----------------------------------------------
-    # OpenCV decoding
-    # ----------------------------------------------
-
-    try:
-        image_array = np.frombuffer(image_bytes, dtype=np.uint8)
-
-        image = cv2.imdecode(
-            image_array,
-            cv2.IMREAD_COLOR,
-        )
-
-    except Exception as exc:
-        logging.exception("Failed to decode uploaded image")
-
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid image file",
-        ) from exc
-
-    if image is None or image.size == 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid image file",
-        )
-
-    # ----------------------------------------------
-    # Dimension protection
-    # ----------------------------------------------
-
-    height, width = image.shape[:2]
-
-    if width > settings.MAX_FACE_IMAGE_WIDTH:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=(
-                f"Image width exceeds the maximum allowed "
-                f"width of {settings.MAX_FACE_IMAGE_WIDTH} pixels"
-            ),
-        )
-
-    if height > settings.MAX_FACE_IMAGE_HEIGHT:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=(
-                f"Image height exceeds the maximum allowed "
-                f"height of {settings.MAX_FACE_IMAGE_HEIGHT} pixels"
-            ),
-        )
-
-    # ----------------------------------------------
-    # Pixel-count protection
-    # ----------------------------------------------
-
-    total_pixels = width * height
-
-    if total_pixels > settings.MAX_FACE_IMAGE_PIXELS:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=(
-                f"Image resolution is too large. "
-                f"Maximum allowed resolution is "
-                f"{settings.MAX_FACE_IMAGE_PIXELS} pixels"
-            ),
-        )
-
-    return image
-
-
-def commit_frame_nonce_reservation(
-    session_id: str,
-    nonce: str,
-) -> str:
-    """Commit a processed frame's nonce reservation."""
-
-    committed, reason, next_nonce = (
-        unified_auth_session_manager
-        .commit_nonce_reservation(
-            session_id,
-            nonce,
-        )
+    image_array = np.frombuffer(
+        image_bytes,
+        dtype=np.uint8,
     )
 
-    if not committed or next_nonce is None:
+    frame = cv2.imdecode(
+        image_array,
+        cv2.IMREAD_COLOR,
+    )
+
+    if frame is None or frame.size == 0:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=reason,
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Could not decode image",
         )
 
-    return next_nonce
+    return frame
 
 
 # ==================================================
@@ -428,25 +327,11 @@ async def enroll_face(
 )
 async def start_unified_auth_session():
     """
-    Start a unified authentication session enforcing
-    the state order:
-
-    CREATED
-        ->
-    LIVENESS_PASSED
-        ->
-    ANTI_SPOOF_PASSED
-        ->
-    FACE_MATCHED
-        ->
-    COMPLETED
+    Start a unified authentication session enforcing state order:
+    CREATED -> LIVENESS_PASSED -> ANTI_SPOOF_PASSED -> FACE_MATCHED -> COMPLETED
     """
-
     session_id = unified_auth_session_manager.create_session()
-
-    session = unified_auth_session_manager.get_session(
-        session_id
-    )
+    session = unified_auth_session_manager.get_session(session_id)
 
     if session is None:
         raise HTTPException(
@@ -454,27 +339,15 @@ async def start_unified_auth_session():
             detail="Could not create unified authentication session",
         )
 
-    # Backward compatibility:
-    # mirror the same detector into the legacy liveness manager.
-
-    from app.services.liveness_session import LivenessSession
-
-    liveness_session_manager.sessions[session_id] = LivenessSession(
-        detector=session.liveness_detector,
-        created_at=session.created_at,
-    )
+    # For full backward compatibility, also mirror into liveness_session_manager
+    liveness_session_manager.sessions[session_id] = session.liveness_detector
 
     return {
         "message": "Authentication session started",
         "session_id": session_id,
-        "nonce": session.current_nonce,
-        "expires_in": (
-            unified_auth_session_manager.SESSION_TIMEOUT_SECONDS
-        ),
+        "expires_in": unified_auth_session_manager.SESSION_TIMEOUT_SECONDS,
         "challenge": session.liveness_detector.challenge,
-        "challenge_message": (
-            session.liveness_detector.challenge_message()
-        ),
+        "challenge_message": session.liveness_detector.challenge_message(),
         "state": session.state.value,
     }
 
@@ -512,15 +385,12 @@ async def start_liveness():
         )
 
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=500,
             detail="Could not create liveness session",
         )
 
-    # Mirror to legacy liveness_session_manager
-    # for backward compatibility.
-
+    # Mirror to legacy liveness_session_manager for backward compatibility
     from app.services.liveness_session import LivenessSession
-
     liveness_session_manager.sessions[session_id] = LivenessSession(
         detector=session.liveness_detector,
         created_at=session.created_at,
@@ -542,13 +412,12 @@ async def start_liveness():
     return {
         "message": "Liveness session started",
         "session_id": session_id,
-        "nonce": session.current_nonce,
-        "expires_in": (
+        "expires_in":
             unified_auth_session_manager
-            .SESSION_TIMEOUT_SECONDS
-        ),
+            .SESSION_TIMEOUT_SECONDS,
         "challenge": challenge,
-        "challenge_message": challenge_message,
+        "challenge_message":
+            challenge_message,
         "state": session.state.value,
     }
 
@@ -563,7 +432,6 @@ async def start_liveness():
 )
 async def process_liveness_frame(
     session_id: str,
-    nonce: str,
     image: UploadFile | None = File(None),
     file: UploadFile | None = File(None),
 ):
@@ -571,29 +439,9 @@ async def process_liveness_frame(
     Process one camera frame for challenge-based
     liveness detection.
 
-    Every frame must contain the current server-generated
-    one-time nonce.
-
-    The nonce is reserved before processing and consumed only after a
-    response-producing frame operation succeeds.
+    The frontend sends multiple frames using the
+    same session_id.
     """
-
-    # ==================================================
-    # REPLAY PROTECTION
-    # ==================================================
-
-    nonce_valid, nonce_reason = (
-        unified_auth_session_manager.reserve_nonce(
-            session_id,
-            nonce,
-        )
-    )
-
-    if not nonce_valid:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=nonce_reason,
-        )
 
     session = (
         unified_auth_session_manager.get_session(
@@ -602,58 +450,31 @@ async def process_liveness_frame(
     )
 
     if session is None:
-        unified_auth_session_manager.rollback_nonce_reservation(
-            session_id,
-            nonce,
-        )
-
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Liveness session is invalid or expired",
-        )
-
-    if session.state not in (
-        AuthState.CREATED,
-        AuthState.LIVENESS_PASSED,
-    ):
-        unified_auth_session_manager.rollback_nonce_reservation(
-            session_id,
-            nonce,
-        )
-        unified_auth_session_manager.invalidate_session(
-            session_id
-        )
-
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
-                "Liveness verification cannot be run "
-                f"in state {session.state.value}"
+                "Liveness session is invalid or expired"
             ),
+        )
+
+    if session.state not in (AuthState.CREATED, AuthState.LIVENESS_PASSED):
+        unified_auth_session_manager.invalidate_session(session_id)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Liveness verification cannot be run in state {session.state.value}",
         )
 
     upload = image or file
 
     if upload is None:
-        unified_auth_session_manager.rollback_nonce_reservation(
-            session_id,
-            nonce,
-        )
-
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No image file provided in form data",
+            detail=(
+                "No image file provided in form data"
+            ),
         )
 
-    try:
-        frame = await decode_upload_image(upload)
-
-    except HTTPException:
-        unified_auth_session_manager.rollback_nonce_reservation(
-            session_id,
-            nonce,
-        )
-        raise
+    frame = await decode_upload_image(upload)
 
     try:
         faces = await run_in_threadpool(
@@ -662,106 +483,61 @@ async def process_liveness_frame(
         )
 
     except Exception:
-        unified_auth_session_manager.rollback_nonce_reservation(
-            session_id,
-            nonce,
-        )
         logger.error(
             "Liveness face detection error",
             exc_info=True,
         )
 
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Could not process liveness frame",
+            status_code=(
+                status.HTTP_500_INTERNAL_SERVER_ERROR
+            ),
+            detail=(
+                "Could not process liveness frame"
+            ),
         )
 
     if len(faces) == 0:
-        next_nonce = commit_frame_nonce_reservation(
-            session_id,
-            nonce,
-        )
-
         return {
             "liveness": False,
             "status": "no_face",
-            "challenge": (
-                session.liveness_detector.challenge
-            ),
-            "challenge_message": (
-                session.liveness_detector.challenge_message()
-            ),
+            "challenge":
+                session.liveness_detector.challenge,
+            "challenge_message":
+                session.liveness_detector.challenge_message(),
             "message": (
                 "No face detected. "
                 "Please look at the camera."
             ),
-            "nonce": next_nonce,
         }
 
     if len(faces) > 1:
-        next_nonce = commit_frame_nonce_reservation(
-            session_id,
-            nonce,
-        )
-
         return {
             "liveness": False,
             "status": "multiple_faces",
-            "challenge": (
-                session.liveness_detector.challenge
-            ),
-            "challenge_message": (
-                session.liveness_detector.challenge_message()
-            ),
+            "challenge":
+                session.liveness_detector.challenge,
+            "challenge_message":
+                session.liveness_detector.challenge_message(),
             "message": (
                 "Multiple faces detected. "
                 "Only one person should be visible."
             ),
-            "nonce": next_nonce,
         }
 
     face = faces[0]
 
-    try:
-        result = await run_in_threadpool(
-            unified_auth_session_manager.process_liveness_frame,
-            session_id,
-            face,
-        )
-
-    except Exception:
-        unified_auth_session_manager.rollback_nonce_reservation(
-            session_id,
-            nonce,
-        )
-        logger.error(
-            "Liveness state processing error",
-            exc_info=True,
-        )
-
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Could not process liveness frame",
-        )
+    result = await run_in_threadpool(
+        unified_auth_session_manager.process_liveness_frame,
+        session_id,
+        face,
+    )
 
     if not result.get("valid"):
-        unified_auth_session_manager.rollback_nonce_reservation(
-            session_id,
-            nonce,
-        )
-
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=result.get(
-                "reason",
-                "Liveness check failed",
-            ),
+            detail=result.get("reason", "Liveness check failed"),
         )
-
-    result["nonce"] = commit_frame_nonce_reservation(
-        session_id,
-        nonce,
-    )
 
     return result
 
@@ -775,13 +551,8 @@ async def process_liveness_frame(
 )
 async def start_anti_spoofing():
     """
-    Legacy anti-spoofing session endpoint.
-
-    The main frontend authentication flow now uses
-    the unified authentication session.
-
-    This endpoint is retained temporarily for backward
-    compatibility.
+    Start a short-lived multi-frame anti-spoofing
+    verification session.
     """
 
     session_id = (
@@ -789,7 +560,7 @@ async def start_anti_spoofing():
     )
 
     logger.info(
-        "Legacy anti-spoofing session created. "
+        "Anti-spoofing session created. "
         "session_id=%s",
         session_id,
     )
@@ -807,7 +578,6 @@ async def start_anti_spoofing():
         ),
     }
 
-
 # ==================================================
 # ANTI-SPOOFING FRAME
 # ==================================================
@@ -818,7 +588,6 @@ async def start_anti_spoofing():
 )
 async def process_anti_spoofing_frame(
     session_id: str,
-    nonce: str,
     image: UploadFile | None = File(None),
     file: UploadFile | None = File(None),
 ):
@@ -826,28 +595,8 @@ async def process_anti_spoofing_frame(
     Process one frame through MiniFASNetV2.
 
     Multiple frames are collected under the same
-    unified authentication session.
-
-    Every frame must contain the current server-generated
-    one-time nonce.
+    anti-spoofing session.
     """
-
-    # ==================================================
-    # REPLAY PROTECTION
-    # ==================================================
-
-    nonce_valid, nonce_reason = (
-        unified_auth_session_manager.reserve_nonce(
-            session_id,
-            nonce,
-        )
-    )
-
-    if not nonce_valid:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=nonce_reason,
-        )
 
     session = (
         unified_auth_session_manager.get_session(
@@ -856,11 +605,6 @@ async def process_anti_spoofing_frame(
     )
 
     if session is None:
-        unified_auth_session_manager.rollback_nonce_reservation(
-            session_id,
-            nonce,
-        )
-
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
@@ -870,19 +614,11 @@ async def process_anti_spoofing_frame(
         )
 
     if session.state != AuthState.LIVENESS_PASSED:
-        unified_auth_session_manager.rollback_nonce_reservation(
-            session_id,
-            nonce,
-        )
-        unified_auth_session_manager.invalidate_session(
-            session_id
-        )
-
+        unified_auth_session_manager.invalidate_session(session_id)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
-                "Liveness verification must pass "
-                "before anti-spoofing. "
+                "Liveness verification must pass before anti-spoofing. "
                 f"Current state: {session.state.value}"
             ),
         )
@@ -890,11 +626,6 @@ async def process_anti_spoofing_frame(
     upload = image or file
 
     if upload is None:
-        unified_auth_session_manager.rollback_nonce_reservation(
-            session_id,
-            nonce,
-        )
-
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
@@ -903,38 +634,28 @@ async def process_anti_spoofing_frame(
             ),
         )
 
-    try:
-        frame = await decode_upload_image(upload)
-
-    except HTTPException:
-        unified_auth_session_manager.rollback_nonce_reservation(
-            session_id,
-            nonce,
-        )
-        raise
+    frame = await decode_upload_image(upload)
 
     # ----------------------------------------------
     # Detect face
     # ----------------------------------------------
 
     try:
+
         faces = await run_in_threadpool(
             face_matcher.detector.detect,
             frame,
         )
 
     except Exception:
-        unified_auth_session_manager.rollback_nonce_reservation(
-            session_id,
-            nonce,
-        )
+
         logger.error(
             "Anti-spoofing face detection error",
             exc_info=True,
         )
 
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=500,
             detail=(
                 "Could not process "
                 "anti-spoofing frame"
@@ -942,30 +663,18 @@ async def process_anti_spoofing_frame(
         )
 
     if len(faces) == 0:
-        next_nonce = commit_frame_nonce_reservation(
-            session_id,
-            nonce,
-        )
-
         return {
             "status": "no_face",
             "message": "No face detected.",
-            "nonce": next_nonce,
         }
 
     if len(faces) > 1:
-        next_nonce = commit_frame_nonce_reservation(
-            session_id,
-            nonce,
-        )
-
         return {
             "status": "multiple_faces",
             "message": (
                 "Multiple faces detected. "
                 "Only one person should be visible."
             ),
-            "nonce": next_nonce,
         }
 
     face = faces[0]
@@ -975,6 +684,7 @@ async def process_anti_spoofing_frame(
     # ----------------------------------------------
 
     try:
+
         prediction = await run_in_threadpool(
             anti_spoofing_service.predict,
             frame,
@@ -982,17 +692,14 @@ async def process_anti_spoofing_frame(
         )
 
     except Exception:
-        unified_auth_session_manager.rollback_nonce_reservation(
-            session_id,
-            nonce,
-        )
+
         logger.error(
             "Anti-spoofing prediction error",
             exc_info=True,
         )
 
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=500,
             detail=(
                 "Anti-spoofing prediction failed"
             ),
@@ -1002,92 +709,41 @@ async def process_anti_spoofing_frame(
     # Store prediction in unified session
     # ----------------------------------------------
 
-    try:
-        res = await run_in_threadpool(
-            unified_auth_session_manager.add_anti_spoof_prediction,
-            session_id,
-            prediction,
-        )
-
-    except Exception:
-        unified_auth_session_manager.rollback_nonce_reservation(
-            session_id,
-            nonce,
-        )
-        logger.error(
-            "Anti-spoofing state processing error",
-            exc_info=True,
-        )
-
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Anti-spoofing prediction failed",
-        )
+    res = await run_in_threadpool(
+        unified_auth_session_manager.add_anti_spoof_prediction,
+        session_id,
+        prediction,
+    )
 
     if not res.get("valid"):
-        unified_auth_session_manager.rollback_nonce_reservation(
-            session_id,
-            nonce,
-        )
-
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=res.get(
-                "reason",
-                "Anti-spoofing check failed",
-            ),
+            detail=res.get("reason", "Anti-spoofing check failed"),
         )
 
     if res.get("status") == "checking":
-        next_nonce = commit_frame_nonce_reservation(
-            session_id,
-            nonce,
-        )
-
         return {
             "status": "checking",
             "frame_number": res["frame_number"],
             "required_frames": res["required_frames"],
             "class_id": prediction["class_id"],
-            "confidence": round(
-                prediction["confidence"],
-                4,
-            ),
+            "confidence": round(prediction["confidence"], 4),
             "is_real": (
-                prediction["class_id"]
-                == ANTI_SPOOF_REAL_CLASS_ID
-                and prediction["confidence"]
-                >= ANTI_SPOOF_MIN_CONFIDENCE
+                prediction["class_id"] == ANTI_SPOOF_REAL_CLASS_ID
+                and prediction["confidence"] >= ANTI_SPOOF_MIN_CONFIDENCE
             ),
-            "nonce": next_nonce,
         }
 
     if res.get("status") == "passed":
-        next_nonce = commit_frame_nonce_reservation(
-            session_id,
-            nonce,
-        )
-
         return {
             "status": "passed",
-            "message": (
-                "Anti-spoofing verification successful"
-            ),
-            "nonce": next_nonce,
+            "message": "Anti-spoofing verification successful",
             **res,
         }
 
-    next_nonce = commit_frame_nonce_reservation(
-        session_id,
-        nonce,
-    )
-
     return {
         "status": "failed",
-        "message": (
-            "Anti-spoofing verification failed"
-        ),
-        "nonce": next_nonce,
+        "message": "Anti-spoofing verification failed",
         **res,
     }
 
@@ -1102,7 +758,6 @@ async def process_anti_spoofing_frame(
 )
 async def face_login(
     session_id: str,
-    nonce: str | None = None,
     image: UploadFile | None = File(None),
     file: UploadFile | None = File(None),
     db: Session = Depends(get_db),
@@ -1112,72 +767,22 @@ async def face_login(
 
     Required security pipeline:
 
-        1. Validate unified authentication session
-        2. Validate one-time request nonce
-        3. Completed liveness challenge
-        4. Completed multi-frame anti-spoofing
-        5. Atomically reserve session for face matching
-        6. SFace face recognition
-        7. User lookup
-        8. Complete and consume unified session
-        9. Door unlock
-        10. JWT creation
-
-    Important:
-        session validation is performed before nonce/image
-        validation so invalid sessions are rejected with
-        401 instead of FastAPI returning 422 for missing
-        request fields.
+        1. Valid liveness session
+        2. Completed liveness challenge
+        3. Anti-spoofing verification
+        4. SFace face recognition
+        5. User lookup
+        6. Liveness session consumption
+        7. Door unlock
+        8. JWT creation
     """
 
     # ==================================================
-    # STEP 1: VALIDATE / RESERVE SESSION FIRST
+    # STEP 1: VERIFY UNIFIED SESSION STATE
     # ==================================================
 
-    # This MUST happen before requiring the nonce or image.
-    #
-    # Otherwise FastAPI can return 422 for a missing nonce
-    # before the security layer gets a chance to reject an
-    # invalid or expired authentication session.
-
-    session = unified_auth_session_manager.get_session(
+    valid, reason = unified_auth_session_manager.validate_and_consume_for_login(
         session_id
-    )
-
-    if session is None:
-        safe_audit_log(
-            db=db,
-            event_type="FACE_LOGIN_FAILED",
-            success=False,
-            details="Unified authentication session is invalid or expired",
-        )
-
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication session is invalid or expired",
-        )
-
-    # ==================================================
-    # STEP 2: ATOMICALLY RESERVE SESSION FOR FACE MATCH
-    # ==================================================
-
-    # This verifies that the authentication pipeline has
-    # reached the required state:
-    #
-    # LIVENESS_PASSED
-    #        ↓
-    # ANTI_SPOOF_PASSED
-    #        ↓
-    # FACE_MATCHED / reserved for login
-    #
-    # The transition is atomic inside the unified
-    # authentication session manager.
-
-    valid, reason = (
-        unified_auth_session_manager
-        .validate_and_consume_for_login(
-            session_id
-        )
     )
 
     if not valid:
@@ -1185,10 +790,7 @@ async def face_login(
             db=db,
             event_type="LIVENESS_FAILED",
             success=False,
-            details=(
-                "Unified auth session validation failed: "
-                f"{reason}"
-            ),
+            details=f"Unified auth session validation failed: {reason}",
         )
 
         raise HTTPException(
@@ -1197,79 +799,12 @@ async def face_login(
         )
 
     # ==================================================
-    # STEP 3: REQUIRE NONCE
-    # ==================================================
-
-    if not nonce:
-        unified_auth_session_manager.invalidate_session(
-            session_id
-        )
-
-        liveness_session_manager.remove_session(
-            session_id
-        )
-
-        safe_audit_log(
-            db=db,
-            event_type="FACE_LOGIN_FAILED",
-            success=False,
-            details="Login request missing nonce",
-        )
-
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication nonce is required",
-        )
-
-    # ==================================================
-    # STEP 4: RESERVE ONE-TIME REQUEST NONCE
-    # ==================================================
-
-    nonce_valid, nonce_reason = (
-        unified_auth_session_manager.reserve_nonce(
-            session_id,
-            nonce,
-        )
-    )
-
-    if not nonce_valid:
-        unified_auth_session_manager.invalidate_session(
-            session_id
-        )
-
-        liveness_session_manager.remove_session(
-            session_id
-        )
-
-        safe_audit_log(
-            db=db,
-            event_type="FACE_LOGIN_FAILED",
-            success=False,
-            details=(
-                "Replay protection rejected login request: "
-                f"{nonce_reason}"
-            ),
-        )
-
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=nonce_reason,
-        )
-
-    # ==================================================
-    # STEP 5: SELECT UPLOADED IMAGE
+    # STEP 2: SELECT UPLOADED IMAGE
     # ==================================================
 
     upload = image or file
 
     if upload is None:
-        unified_auth_session_manager.invalidate_session(
-            session_id
-        )
-
-        liveness_session_manager.remove_session(
-            session_id
-        )
 
         safe_audit_log(
             db=db,
@@ -1287,22 +822,16 @@ async def face_login(
         )
 
     # ==================================================
-    # STEP 6: DECODE IMAGE
+    # STEP 3: DECODE IMAGE
     # ==================================================
 
     try:
+
         frame = await decode_upload_image(
             upload
         )
 
     except HTTPException as exc:
-        unified_auth_session_manager.invalidate_session(
-            session_id
-        )
-
-        liveness_session_manager.remove_session(
-            session_id
-        )
 
         safe_audit_log(
             db=db,
@@ -1317,27 +846,21 @@ async def face_login(
         raise
 
     # ==================================================
-    # STEP 7: DETECT FACE FOR ANTI-SPOOFING
+    # STEP 4: DETECT FACE FOR ANTI-SPOOFING
     # ==================================================
 
     try:
+
         faces = await run_in_threadpool(
             face_matcher.detector.detect,
             frame,
         )
 
     except Exception:
+
         logger.error(
             "Anti-spoofing face detection error",
             exc_info=True,
-        )
-
-        unified_auth_session_manager.invalidate_session(
-            session_id
-        )
-
-        liveness_session_manager.remove_session(
-            session_id
         )
 
         safe_audit_log(
@@ -1351,7 +874,9 @@ async def face_login(
         )
 
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=(
+                status.HTTP_500_INTERNAL_SERVER_ERROR
+            ),
             detail=(
                 "Could not process "
                 "anti-spoofing verification"
@@ -1359,17 +884,10 @@ async def face_login(
         )
 
     # ==================================================
-    # STEP 8: REQUIRE EXACTLY ONE FACE
+    # STEP 5: REQUIRE EXACTLY ONE FACE
     # ==================================================
 
     if len(faces) == 0:
-        unified_auth_session_manager.invalidate_session(
-            session_id
-        )
-
-        liveness_session_manager.remove_session(
-            session_id
-        )
 
         safe_audit_log(
             db=db,
@@ -1384,13 +902,6 @@ async def face_login(
         )
 
     if len(faces) > 1:
-        unified_auth_session_manager.invalidate_session(
-            session_id
-        )
-
-        liveness_session_manager.remove_session(
-            session_id
-        )
 
         safe_audit_log(
             db=db,
@@ -1410,10 +921,11 @@ async def face_login(
     face = faces[0]
 
     # ==================================================
-    # STEP 9: MINI FASNET V2 ANTI-SPOOFING
+    # STEP 6: MINI FASNET V2 ANTI-SPOOFING
     # ==================================================
 
     try:
+
         anti_spoof_result = (
             await run_in_threadpool(
                 anti_spoofing_service.predict,
@@ -1423,17 +935,10 @@ async def face_login(
         )
 
     except ValueError as exc:
+
         logger.error(
             "Anti-spoofing validation error: %s",
             exc,
-        )
-
-        unified_auth_session_manager.invalidate_session(
-            session_id
-        )
-
-        liveness_session_manager.remove_session(
-            session_id
         )
 
         safe_audit_log(
@@ -1452,17 +957,10 @@ async def face_login(
         )
 
     except Exception:
+
         logger.error(
             "Anti-spoofing inference error",
             exc_info=True,
-        )
-
-        unified_auth_session_manager.invalidate_session(
-            session_id
-        )
-
-        liveness_session_manager.remove_session(
-            session_id
         )
 
         safe_audit_log(
@@ -1476,7 +974,9 @@ async def face_login(
         )
 
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=(
+                status.HTTP_500_INTERNAL_SERVER_ERROR
+            ),
             detail=(
                 "Anti-spoofing verification failed"
             ),
@@ -1512,17 +1012,10 @@ async def face_login(
     )
 
     # ==================================================
-    # STEP 10: REJECT SPOOF
+    # STEP 7: REJECT SPOOF
     # ==================================================
 
     if not is_real:
-        unified_auth_session_manager.invalidate_session(
-            session_id
-        )
-
-        liveness_session_manager.remove_session(
-            session_id
-        )
 
         safe_audit_log(
             db=db,
@@ -1552,10 +1045,11 @@ async def face_login(
         )
 
     # ==================================================
-    # STEP 11: SFACE FACE AUTHENTICATION
+    # STEP 8: SFACE FACE AUTHENTICATION
     # ==================================================
 
     try:
+
         user_id, similarity = (
             await run_in_threadpool(
                 face_login_service.authenticate,
@@ -1565,13 +1059,6 @@ async def face_login(
         )
 
     except ValueError as exc:
-        unified_auth_session_manager.invalidate_session(
-            session_id
-        )
-
-        liveness_session_manager.remove_session(
-            session_id
-        )
 
         safe_audit_log(
             db=db,
@@ -1586,17 +1073,10 @@ async def face_login(
         )
 
     except Exception:
+
         logger.error(
             "Face login error",
             exc_info=True,
-        )
-
-        unified_auth_session_manager.invalidate_session(
-            session_id
-        )
-
-        liveness_session_manager.remove_session(
-            session_id
         )
 
         safe_audit_log(
@@ -1610,28 +1090,22 @@ async def face_login(
         )
 
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=(
+                status.HTTP_500_INTERNAL_SERVER_ERROR
+            ),
             detail="Face authentication failed",
         )
 
     # ==================================================
-    # STEP 12: FACE NOT RECOGNIZED
+    # STEP 9: FACE NOT RECOGNIZED
     # ==================================================
 
     if user_id is None:
+
         logger.warning(
             "Face authentication failed. "
-            "Similarity=%.4f. "
-            "Invalidating authentication session.",
+            "Similarity=%.4f",
             similarity,
-        )
-
-        unified_auth_session_manager.invalidate_session(
-            session_id
-        )
-
-        liveness_session_manager.remove_session(
-            session_id
         )
 
         safe_audit_log(
@@ -1651,7 +1125,7 @@ async def face_login(
         )
 
     # ==================================================
-    # STEP 13: FIND AUTHENTICATED USER
+    # STEP 10: FIND AUTHENTICATED USER
     # ==================================================
 
     user = (
@@ -1661,18 +1135,11 @@ async def face_login(
     )
 
     if not user:
+
         logger.error(
             "Face template belongs to missing user. "
             "user_id=%s",
             user_id,
-        )
-
-        unified_auth_session_manager.invalidate_session(
-            session_id
-        )
-
-        liveness_session_manager.remove_session(
-            session_id
         )
 
         safe_audit_log(
@@ -1693,78 +1160,60 @@ async def face_login(
         )
 
     # ==================================================
-    # STEP 14: COMPLETE AND CONSUME SESSION
+    # SUCCESSFUL FACE AUTHENTICATION
     # ==================================================
 
-    session_completed = (
-        unified_auth_session_manager.complete_session(
-            session_id=session_id,
-            user_id=user.id,
-            similarity=similarity,
-        )
+    # At this point:
+    #
+    # 1. Liveness passed
+    # 2. Exactly one face was detected
+    # 3. Anti-spoofing passed
+    # 4. SFace matched the face
+    # 5. User exists
+    #
+    # Only NOW:
+    #   - consume liveness session
+    #   - unlock door
+    #   - create JWT
+
+    # ----------------------------------------------
+    # Complete and consume unified auth session
+    # ----------------------------------------------
+
+    unified_auth_session_manager.complete_session(
+        session_id,
+        user.id,
+        similarity,
     )
-
-    if not session_completed:
-        logger.warning(
-            "Authentication session completion failed. "
-            "Door unlock blocked. "
-            "session_id=%s user_id=%s",
-            session_id,
-            user.id,
-        )
-
-        unified_auth_session_manager.invalidate_session(
-            session_id
-        )
-
-        liveness_session_manager.remove_session(
-            session_id
-        )
-
-        safe_audit_log(
-            db=db,
-            event_type="AUTH_SESSION_COMPLETION_FAILED",
-            success=False,
-            user_id=user.id,
-            similarity=similarity,
-            details=(
-                "Unified authentication session "
-                "could not be completed or was "
-                "already consumed"
-            ),
-        )
-
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication session is no longer valid.",
-        )
-
-    # ==================================================
-    # STEP 15: CLEAN UP LEGACY LIVENESS SESSION
-    # ==================================================
-
     liveness_session_manager.remove_session(
         session_id
     )
 
-    # ==================================================
-    # STEP 16: UNLOCK DOOR
-    # ==================================================
+    # ----------------------------------------------
+    # Unlock door
+    # ----------------------------------------------
 
-    door_grant = unified_auth_session_manager.create_door_grant(
-        user_id=user.id,
-    )
+    door_unlocked = door_service.unlock()
 
-    logger.info(
-        "Face authentication successful. "
-        "One-time door authorization grant issued "
-        "for user_id=%s",
-        user.id,
-    )
+    if door_unlocked:
 
-    # ==================================================
-    # STEP 17: AUDIT SUCCESSFUL FACE AUTHENTICATION
-    # ==================================================
+        logger.info(
+            "Face authentication successful. "
+            "Door unlocked for user_id=%s",
+            user.id,
+        )
+
+    else:
+
+        logger.error(
+            "Face authentication successful but "
+            "door failed to unlock. user_id=%s",
+            user.id,
+        )
+
+    # ----------------------------------------------
+    # Audit successful face authentication
+    # ----------------------------------------------
 
     safe_audit_log(
         db=db,
@@ -1774,16 +1223,17 @@ async def face_login(
         similarity=similarity,
         details=(
             "Face authentication successful; "
-            "liveness passed; "
             "anti-spoofing passed; "
-            f"anti_spoof_confidence={spoof_confidence:.4f}; "
-            "one-time door authorization issued"
+            f"anti_spoof_confidence="
+            f"{spoof_confidence:.4f}; "
+            f"door_unlock="
+            f"{'success' if door_unlocked else 'failed'}"
         ),
     )
 
-    # ==================================================
-    # STEP 18: CREATE JWT ACCESS TOKEN
-    # ==================================================
+    # ----------------------------------------------
+    # Create JWT access token
+    # ----------------------------------------------
 
     access_token = create_access_token(
         data={
@@ -1792,9 +1242,9 @@ async def face_login(
         }
     )
 
-    # ==================================================
-    # STEP 19: SUCCESSFUL RESPONSE
-    # ==================================================
+    # ----------------------------------------------
+    # Successful response
+    # ----------------------------------------------
 
     return {
         "message": "Face login successful",
@@ -1817,6 +1267,9 @@ async def face_login(
                 4,
             ),
         },
-        "door": "authorization_required",
-        "door_grant": door_grant,
+        "door": (
+            "unlocked"
+            if door_unlocked
+            else "unlock_failed"
+        ),
     }
