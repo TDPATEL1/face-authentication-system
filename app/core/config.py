@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     DOOR_CONTROLLER: str = "simulation"
     ESP32_IP: str = "http://127.0.0.1:9000"
     ESP32_TIMEOUT: float = 3.0
+    ESP32_SHARED_SECRET: str
 
     # ----------------------------------------------
     # Face Image Security Configuration
@@ -44,6 +45,10 @@ class Settings(BaseSettings):
     MAX_FACE_IMAGE_WIDTH: int = 4096
     MAX_FACE_IMAGE_HEIGHT: int = 4096
     MAX_FACE_IMAGE_PIXELS: int = 16_777_216
+
+    # Production Network Security
+    ALLOWED_HOSTS: str = "localhost,127.0.0.1,testserver"
+    CORS_ORIGINS: str = "http://localhost:5500,http://127.0.0.1:5500"
 
     model_config = SettingsConfigDict(
         env_file=".env",

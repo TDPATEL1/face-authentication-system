@@ -3,8 +3,7 @@ from logging.config import fileConfig
 from alembic import context
 
 from app.core.database import engine, Base
-from app.models import User, FaceTemplate
-
+from app.models import User, FaceTemplate, AuditLog
 
 config = context.config
 

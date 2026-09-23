@@ -5,8 +5,18 @@
 // Wi-Fi Configuration
 // ==================================================
 
-const char* WIFI_SSID = "Prizor_AITECH";
-const char* WIFI_PASSWORD = "qwerty@54321";
+const char* WIFI_SSID = "YOUR_WIFI_SSID";
+const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
+
+// ==================================================
+// ESP32 API Authentication
+// ==================================================
+
+// Must exactly match ESP32_SHARED_SECRET in FastAPI .env
+const char* DOOR_SHARED_SECRET = "hbtCMA2Fs9qNqMZlGAPf8cblk68quxgZe3t2O5-e18g";
+
+// Header used by FastAPI
+const char* AUTH_HEADER = "X-Door-Authorization";
 
 // ==================================================
 // Hardware
@@ -23,6 +33,48 @@ WebServer server(80);
 // Door state
 bool doorUnlocked = false;
 
+// ==================================================
+// Helper: Authentication
+// ==================================================
+
+bool isAuthorized() {
+
+    if (!server.hasHeader(AUTH_HEADER)) {
+
+        Serial.println(
+            "Unauthorized request: missing authentication header"
+        );
+
+        return false;
+    }
+
+    String providedSecret =
+        server.header(AUTH_HEADER);
+
+    if (!providedSecret.equals(DOOR_SHARED_SECRET)) {
+
+        Serial.println(
+            "Unauthorized request: invalid authentication secret"
+        );
+
+        return false;
+    }
+
+    return true;
+}
+
+// ==================================================
+// Helper: Unauthorized Response
+// ==================================================
+
+void sendUnauthorizedResponse() {
+
+    server.send(
+        401,
+        "application/json",
+        "{\"success\":false,\"message\":\"Unauthorized\"}"
+    );
+}
 
 // ==================================================
 // Helper: JSON Response
@@ -33,12 +85,14 @@ void sendJsonResponse(
     const String& message
 ) {
     String json = "{";
+
     json += "\"success\":true,";
     json += "\"message\":\"";
     json += message;
     json += "\",";
     json += "\"unlocked\":";
     json += doorUnlocked ? "true" : "false";
+
     json += "}";
 
     server.send(
@@ -48,12 +102,18 @@ void sendJsonResponse(
     );
 }
 
-
 // ==================================================
 // Unlock Door
 // ==================================================
 
 void handleUnlock() {
+
+    if (!isAuthorized()) {
+
+        sendUnauthorizedResponse();
+
+        return;
+    }
 
     doorUnlocked = true;
 
@@ -70,12 +130,18 @@ void handleUnlock() {
     );
 }
 
-
 // ==================================================
 // Lock Door
 // ==================================================
 
 void handleLock() {
+
+    if (!isAuthorized()) {
+
+        sendUnauthorizedResponse();
+
+        return;
+    }
 
     doorUnlocked = false;
 
@@ -92,16 +158,24 @@ void handleLock() {
     );
 }
 
-
 // ==================================================
 // Door Status
 // ==================================================
 
 void handleStatus() {
 
+    if (!isAuthorized()) {
+
+        sendUnauthorizedResponse();
+
+        return;
+    }
+
     String json = "{";
+
     json += "\"unlocked\":";
     json += doorUnlocked ? "true" : "false";
+
     json += "}";
 
     server.send(
@@ -110,7 +184,6 @@ void handleStatus() {
         json
     );
 }
-
 
 // ==================================================
 // Not Found
@@ -125,7 +198,6 @@ void handleNotFound() {
     );
 }
 
-
 // ==================================================
 // Setup
 // ==================================================
@@ -136,7 +208,10 @@ void setup() {
 
     delay(1000);
 
+    // ------------------------------------------------
     // Configure LED
+    // ------------------------------------------------
+
     pinMode(
         DOOR_LED_PIN,
         OUTPUT
@@ -177,6 +252,19 @@ void setup() {
     Serial.println(WiFi.localIP());
 
     // ------------------------------------------------
+    // Collect Authentication Header
+    // ------------------------------------------------
+
+    const char* headerKeys[] = {
+        AUTH_HEADER
+    };
+
+    server.collectHeaders(
+        headerKeys,
+        1
+    );
+
+    // ------------------------------------------------
     // API Routes
     // ------------------------------------------------
 
@@ -203,14 +291,14 @@ void setup() {
     );
 
     // ------------------------------------------------
-    // Start server
+    // Start Server
     // ------------------------------------------------
 
     server.begin();
 
     Serial.println("HTTP server started");
+    Serial.println("Door API authentication enabled");
 }
-
 
 // ==================================================
 // Main Loop
@@ -220,4 +308,3 @@ void loop() {
 
     server.handleClient();
 }
-

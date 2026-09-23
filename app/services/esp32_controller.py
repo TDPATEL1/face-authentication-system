@@ -1,8 +1,10 @@
 import logging
 from typing import Optional
-from app.services.door_controller import DoorController
 
 import requests
+
+from app.core.config import settings
+from app.services.door_controller import DoorController
 
 
 logger = logging.getLogger(__name__)
@@ -12,7 +14,10 @@ class ESP32DoorController(DoorController):
     """
     Controller used by FastAPI to communicate with an ESP32.
 
-    The ESP32 is expected to expose:
+    The ESP32 requires a shared secret in the
+    X-Door-Authorization header.
+
+    Expected endpoints:
 
         POST /unlock
         POST /lock
@@ -23,13 +28,26 @@ class ESP32DoorController(DoorController):
         self,
         esp32_ip: str,
         timeout: float = 3.0,
+        shared_secret: str | None = None,
     ):
         self.esp32_ip = esp32_ip.rstrip("/")
         self.timeout = timeout
 
+        self.shared_secret = (
+            shared_secret
+            if shared_secret is not None
+            else settings.ESP32_SHARED_SECRET
+        )
+
+    @property
+    def headers(self) -> dict[str, str]:
+        return {
+            "X-Door-Authorization": self.shared_secret,
+        }
+
     def unlock(self) -> bool:
         """
-        Send an unlock command to the ESP32.
+        Send an authenticated unlock command to the ESP32.
         """
 
         url = f"{self.esp32_ip}/unlock"
@@ -37,6 +55,7 @@ class ESP32DoorController(DoorController):
         try:
             response = requests.post(
                 url,
+                headers=self.headers,
                 timeout=self.timeout,
             )
 
@@ -47,7 +66,9 @@ class ESP32DoorController(DoorController):
             success = data.get("success", False)
 
             if success:
-                logger.info("ESP32 door unlock command successful")
+                logger.info(
+                    "ESP32 door unlock command successful"
+                )
                 return True
 
             logger.warning(
@@ -73,7 +94,7 @@ class ESP32DoorController(DoorController):
 
     def lock(self) -> bool:
         """
-        Send a lock command to the ESP32.
+        Send an authenticated lock command to the ESP32.
         """
 
         url = f"{self.esp32_ip}/lock"
@@ -81,6 +102,7 @@ class ESP32DoorController(DoorController):
         try:
             response = requests.post(
                 url,
+                headers=self.headers,
                 timeout=self.timeout,
             )
 
@@ -91,7 +113,9 @@ class ESP32DoorController(DoorController):
             success = data.get("success", False)
 
             if success:
-                logger.info("ESP32 door lock command successful")
+                logger.info(
+                    "ESP32 door lock command successful"
+                )
                 return True
 
             logger.warning(
@@ -118,6 +142,8 @@ class ESP32DoorController(DoorController):
     def is_unlocked(self) -> bool:
         """
         Ask the ESP32 for the current door state.
+
+        Status requests are also authenticated.
         """
 
         url = f"{self.esp32_ip}/status"
@@ -125,6 +151,7 @@ class ESP32DoorController(DoorController):
         try:
             response = requests.get(
                 url,
+                headers=self.headers,
                 timeout=self.timeout,
             )
 

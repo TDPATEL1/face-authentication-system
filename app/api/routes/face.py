@@ -382,6 +382,8 @@ async def enroll_face(
             db.add(new_template)
 
         db.commit()
+        
+        face_login_service.invalidate_embedding(current_user.id)
 
     except SQLAlchemyError:
         db.rollback()
