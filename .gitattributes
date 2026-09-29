@@ -1,0 +1,2 @@
+docker/start.sh text eol=lf
+docker/generate-dev-certs.sh text eol=lf

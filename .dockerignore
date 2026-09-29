@@ -15,6 +15,11 @@ htmlcov/
 .idea/
 
 .env
+.env.*
+!.env.example
+
+nginx/certs/*.key
+nginx/certs/*.crt
 
 *.log
 

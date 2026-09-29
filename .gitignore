@@ -43,3 +43,10 @@ face_data/
 # OS
 .DS_Store
 Thumbs.db
+
+# Database backups
+backups/
+
+# TLS certificates and private keys (keep directory via .gitkeep)
+nginx/certs/*
+!nginx/certs/.gitkeep

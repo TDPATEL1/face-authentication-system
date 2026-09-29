@@ -1,19 +1,57 @@
+# Face Authentication stack.
+#
+# PostgreSQL password: Docker Compose substitutes ${POSTGRES_PASSWORD}
+# from the project `.env` file (or your shell). It does NOT read
+# `.env.docker` for that substitution.
+#
+# Setup:
+#   copy .env.example .env
+#   copy .env.example .env.docker
+# Then set the same POSTGRES_PASSWORD in `.env` and in DATABASE_URL
+# inside `.env.docker`. Never commit those files.
+#
+# TLS: generate nginx/certs locally (docker/generate-dev-certs.ps1).
+# Do not commit private keys.
+
 services:
+
+  postgres:
+    image: postgres:18
+
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in a project .env file (copy .env.example to .env)}
+      POSTGRES_DB: user_auth_db
+
+    volumes:
+      - postgres_data:/var/lib/postgresql
+
+    restart: unless-stopped
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U postgres -d user_auth_db"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 
   face-auth-api:
     build:
       context: .
       dockerfile: Dockerfile
 
-    container_name: face-auth-api
-
     env_file:
       - .env.docker
 
     restart: unless-stopped
 
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
     expose:
       - "8000"
@@ -37,16 +75,17 @@ services:
         ]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 30s
+      retries: 5
+      start_period: 90s
+
 
   nginx:
     image: nginx:alpine
-    container_name: face-auth-nginx
 
     ports:
       - "80:80"
       - "443:443"
+
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/certs:/etc/nginx/certs:ro
@@ -55,4 +94,8 @@ services:
       face-auth-api:
         condition: service_healthy
 
-    restart: unless-stopped 
+    restart: unless-stopped
+
+
+volumes:
+  postgres_data:

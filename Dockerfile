@@ -1,4 +1,4 @@
-FROM python:3.14-slim
+FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -6,30 +6,38 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Runtime libraries required by OpenCV/ONNX workloads
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        libglib2.0-0 \
-        libgl1 \
-        libgomp1 \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libglib2.0-0 \
+    libgl1 \
+    libgomp1 \
     && rm -rf /var/lib/apt/lists/*
+
+RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin appuser
 
 COPY requirements.txt .
 
-RUN pip install --upgrade pip \
-    && pip install -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Application source
 COPY app ./app
 COPY face_service ./face_service
-
-# Database migration files
+COPY models ./models
 COPY alembic ./alembic
 COPY alembic.ini .
+COPY docker/start.sh ./start.sh
 
-# Face recognition models
-COPY models ./models
+RUN sed -i '1s/^\xEF\xBB\xBF//' /app/start.sh && \
+    sed -i 's/\r$//' /app/start.sh && \
+    chmod +x /app/start.sh && \
+    chown -R appuser:appuser /app
+
+USER appuser
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--timeout-graceful-shutdown", "30"]
+HEALTHCHECK --interval=30s \
+            --timeout=5s \
+            --start-period=90s \
+            --retries=5 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)" || exit 1
+
+CMD ["/bin/sh", "/app/start.sh"]
